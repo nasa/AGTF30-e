@@ -1,7 +1,7 @@
 % run_AGTF30e_script.m ===================================================%
 
 % Written by: Jonathan Kratz (NASA GRC - LCC)
-% Date: 9/14/2023
+% Date: 10/18/2024
 % Description: This script is a template for running the AGTF30-e model.
 %   This script can be modified to run other simulation scenarios or used a
 %   a basis for setting up a seperate script for single or batch
@@ -20,9 +20,7 @@ In = []; % empty array for now
 filename = 'AGTF30e_Inputs.xlsx'; %file to derive inputs from
 Mdl = 1; % dynamic model
 SSsolverSP = 2; % doesn't matter, not using steady-state model
-dem = []; % empty array - use default values
-veate = []; % empty array - use default values
-MWS = Setup_Simulation(inputMethod,In,filename,Mdl,SSsolverSP,dem,veate);
+MWS = Setup_Simulation(inputMethod,In,filename,Mdl,SSsolverSP);
 
 % Modify the workspace (if desired) --------------------------------------%
 
@@ -33,18 +31,21 @@ disp('Updating Workspace ...');
 
 % Options
 MWS.In.Options.HybridConfig = 1; %1-Standard, 2-Boost, 3-PEx
+MWS.In.Options.EPSLosses = 2; %1-No Losses, 2-Losses
 MWS.In.Options.EngineEMInt = 1; %1-DEM, 2-VEATE-PGB
 MWS.In.Options.PGBConfig = 2; %1-HP Sun, LP Ring, 2-HP Sun, LP Carrier
                               %3-HP Ring, LP Sun, 4-HP Ring, LP Carrier
                               %5-HP Carrier, LP Sun, 6-HP Carrier, LP Ring
+                              %NOTE: 1, 2, 4, are valid entries (3 5, and 6
+                              %are not)
 MWS.In.Options.WfTransientLogic = 2; % 1-General Limiter, 2-Ratio Unit Schedule
-MWS.In.Options.TEEM = 0; %0-disable TEEM, 1-Enable TEEM
+MWS.In.Options.TEEM = 1; %0-disable TEEM, 1-Enable TEEM
 
 % Environment Inputs
 MWS.In.t_Alt = [0 10];
-MWS.In.Alt = [0 0];
+MWS.In.Alt = 0*[1 1];
 MWS.In.t_MN = [0 10];
-MWS.In.MN = [0 0];
+MWS.In.MN = 0*[1 1];
 MWS.In.t_dTamb = [0 10];
 MWS.In.dTamb = [0 0];
 
@@ -54,17 +55,13 @@ MWS.In.PLA = [40 40 80 80 40 40];
 MWS.In.t_Boost = [0 3 3.015 70 70.015 120];
 MWS.In.Boost = [0 0 1 1 0 0];
 MWS.In.t_Charge = [0 95 95.015 120];
-MWS.In.Charge = [0 0 1 1];
+MWS.In.Charge = [1 1 1 1];
 MWS.In.t_EPT = [0 65 65.015 95 95.015 120];
 MWS.In.EPT = [0 0 1 1 0 0];
 
-% Engine-EM Integration Specification
-dem = [];
-veate = [];
-
 % Update MWS
 inputMethod = 1;
-MWS = Setup_Simulation(inputMethod,MWS.In,filename,Mdl,SSsolverSP,dem,veate);
+MWS = Setup_Simulation(inputMethod,MWS.In,filename,Mdl,SSsolverSP);
 
 % Run the simulation -----------------------------------------------------%
 

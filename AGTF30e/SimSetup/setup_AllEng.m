@@ -1,4 +1,4 @@
-function MWS = setup_AllEng(MWS,DEM,VEATE)
+function MWS = setup_AllEng(MWS)
 
 MWS.iDesign = 2;
 
@@ -50,10 +50,5 @@ MWS = setup_Sensor(MWS);
 MWS = setup_Actuators(MWS);
 
 %Shaft, Gearboxes, and Power System
-MWS = setup_ShaftGB_PwrSys(MWS,DEM,VEATE);
-% % Low pressure shaft inertia slugs * ft2
-% % MWS.Shaft.LPS_Inertia = (484135.-450102.)/32.2/144.; %old
-% MWS.Shaft.LPS_Inertia = ((450102/(3.1*3.1)) + 17796 + 16237) /32.2/144.; 
-% MWS.Shaft.LPS_Eff = 0.99;
-% % High pressure shaft inertia, slugs*ft2
-% MWS.Shaft.HPS_Inertia = 8627/32.2/144.;
+MWS = setup_ShaftGB_PwrSys(MWS);
+MWS = Setup_EMTAT_EPS(MWS);

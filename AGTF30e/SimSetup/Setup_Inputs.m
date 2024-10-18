@@ -31,6 +31,8 @@ if method == 1 % use input struction In
     % Options
     % -- Hybrid Option (1-Standard Engine, 2-Boost, 3-PEx)
     MWS.In.Options.HybridConfig = In.Options.HybridConfig; 
+    % -- Electric Power System Loss Option (1-No losses (idealisitc), 2-Losses (realistic))
+    MWS.In.Options.EPSLosses = In.Options.EPSLosses;
     % -- Engine-EM Integration Option (1-Dedicated EM Approach, 2-VEATE Gearbox Approach)
     MWS.In.Options.EngineEMInt = In.Options.EngineEMInt;
     % -- VEATE Gearbox Configuration Option
@@ -166,100 +168,103 @@ elseif method == 2 % use input from formated excel file
     %corresponding to the last entry for each individual data set which 
     %must have time and value vectors of the same length):
     %   Option.HybridConfig: B12
-    %   Option.EngineEMInt: B13
-    %   Option.PGBConfig: B14
-    %   Option.WfTransientLogic: B15
-    %   Option.TEEM: B16
-    %   t_Alt: A22:Ax
-    %   Alt: B22:Bx
-    %   t_dTamb: C22:Cx
-    %   dTamb: D22:Dx
-    %   t_MN: E22:Ex
-    %   MN: F22:Fx
-    %   t_PExAC: G22:Gx
-    %   PExAC: H22:Hx
-    %   t_PLA: J22:Jx
-    %   PLA: K22:Kx
-    %   t_Boost: L22:Lx
-    %   Boost: M22:Mx
-    %   t_EPT: N22:Nx
-    %   EPT: O22:Ox
-    %   t_Charge: P22:Px
-    %   Charge: Q22:Qx
-    %   N1cManEn = BG20
-    %   t_N1cMan: R22:Rx
-    %   N1cMan: S22:SSx
-    %   WfManEn = BG21
-    %   t_WfMan: T22:Tx
-    %   WfMan: U22:Ux
-    %   VBVManEn = BG22
-    %   t_VBVMan: V22:Vx
-    %   VBVMan: W22:Wx
-    %   VAFNManEn = BG23
-    %   t_VAFNMan: X22:Xx
-    %   VAFNMan: Y22:Yx
-    %   PwrInLPNomManEn = BG24
-    %   t_PwrInLPNomMan: Z22:Zx
-    %   PwrInLPNomMan: AA22:AAx
-    %   PwrInLPOffNomManEn = BG25
-    %   t_PwrInLPOffNomMan: AB22:ABx
-    %   PwrInLPOffNomMan: AC22:ACx
-    %   PwrInHPNomManEn = BG26
-    %   t_PwrInHPNomMan: AD22:ADx
-    %   PwrInHPNomMan: AE22:AEx
-    %   PwrInHPOffNomManEn = BG27
-    %   t_PwrInHPOffNomMan: AF22:AFx
-    %   PwrInHPOffNomMan: AG22:AGx
-    %   PwrInLPEMNomManEn = BG28
-    %   t_PwrInLPEMNomMan: AH22:AHx
-    %   PwrInLPEMNomMan: AI22:AIx
-    %   PwrInLPEMOffNomManEn = BG29
-    %   t_PwrInLPEMOffNomMan: AJ22:AJx
-    %   PwrInLPEMOffNomMan: AK22:AKx
-    %   PwrInHPEMNomManEn = BG30
-    %   t_PwrInHPEMNomMan: AL22:ALx
-    %   PwrInHPEMNomMan: AM22:AMx
-    %   PwrInHPEMOffNomManEn = BG31
-    %   t_PwrInHPEMOffNomMan: AN22:ANx
-    %   PwrInHPEMOffNomMan: AO22:AOx
-    %   PwrInSEMNomManEn = BG32
-    %   t_PwrInSEMNomMan: AP22:APx
-    %   PwrInSEMNomMan: AQ22:AQx
-    %   PwrInSEMOffNomManEn = BG33
-    %   t_PwrInSEMOffNomMan: AR22:ARx
-    %   PwrInSEMOffNomMan: AS22:ASx
-    %   PwrInREMNomManEn = BG34
-    %   t_PwrInREMNomMan: AT22:ATx
-    %   PwrInREMNomMan: AU22:AUx
-    %   PwrInREMOffNomManEn = BG35
-    %   t_PwrInREMOffNomMan: AV22:AVx
-    %   PwrInREMOffNomMan: AW22:AWx
-    %   PwrInCEMNomManEn = BG36
-    %   t_PwrInCEMNomMan: AX22:AXx
-    %   PwrInCEMNomMan: AY22:AYx
-    %   PwrInCEMOffNomManEn = BG37
-    %   t_PwrInCEMOffNomMan: AZ22:AZx
-    %   PwrInCEMOffNomMan: BA22:BAx
-    %   PwrInPEMNomManEn = BG38
-    %   t_PwrInPEMNomMan: BB22:BBx
-    %   PwrInCEMNomMan: BC22:BCx
-    %   PwrInPEMOffNomManEn = BG39
-    %   t_PwrInPEMOffNomMan: BD22:BDx
-    %   PwrInPEMOffNomMan: BE22:BEx
-    %   EnLimitStop_Prim: BJ20:BJ48
-    %   EnLimitStop_VBV: BM20:BM21
-    %   EnLimitStop_VAFN: BM25:BM26
+    %   Option.EPSLosses: B13
+    %   Option.EngineEMInt: B14
+    %   Option.PGBConfig: B15
+    %   Option.WfTransientLogic: B16
+    %   Option.TEEM: B17
+    %   t_Alt: A23:Ax
+    %   Alt: B23:Bx
+    %   t_dTamb: C23:Cx
+    %   dTamb: D23:Dx
+    %   t_MN: E23:Ex
+    %   MN: F23:Fx
+    %   t_PExAC: G23:Gx
+    %   PExAC: H23:Hx
+    %   t_PLA: J23:Jx
+    %   PLA: K23:Kx
+    %   t_Boost: L23:Lx
+    %   Boost: M23:Mx
+    %   t_EPT: N23:Nx
+    %   EPT: O23:Ox
+    %   t_Charge: P23:Px
+    %   Charge: Q23:Qx
+    %   N1cManEn = BG21
+    %   t_N1cMan: R23:Rx
+    %   N1cMan: S23:SSx
+    %   WfManEn = BG22
+    %   t_WfMan: T23:Tx
+    %   WfMan: U23:Ux
+    %   VBVManEn = BG23
+    %   t_VBVMan: V23:Vx
+    %   VBVMan: W23:Wx
+    %   VAFNManEn = BG24
+    %   t_VAFNMan: X23:Xx
+    %   VAFNMan: Y23:Yx
+    %   PwrInLPNomManEn = BG25
+    %   t_PwrInLPNomMan: Z23:Zx
+    %   PwrInLPNomMan: AA23:AAx
+    %   PwrInLPOffNomManEn = BG26
+    %   t_PwrInLPOffNomMan: AB23:ABx
+    %   PwrInLPOffNomMan: AC23:ACx
+    %   PwrInHPNomManEn = BG27
+    %   t_PwrInHPNomMan: AD23:ADx
+    %   PwrInHPNomMan: AE23:AEx
+    %   PwrInHPOffNomManEn = BG28
+    %   t_PwrInHPOffNomMan: AF23:AFx
+    %   PwrInHPOffNomMan: AG23:AGx
+    %   PwrInLPEMNomManEn = BG29
+    %   t_PwrInLPEMNomMan: AH23:AHx
+    %   PwrInLPEMNomMan: AI23:AIx
+    %   PwrInLPEMOffNomManEn = BG30
+    %   t_PwrInLPEMOffNomMan: AJ23:AJx
+    %   PwrInLPEMOffNomMan: AK23:AKx
+    %   PwrInHPEMNomManEn = BG31
+    %   t_PwrInHPEMNomMan: AL23:ALx
+    %   PwrInHPEMNomMan: AM23:AMx
+    %   PwrInHPEMOffNomManEn = BG32
+    %   t_PwrInHPEMOffNomMan: AN23:ANx
+    %   PwrInHPEMOffNomMan: AO23:AOx
+    %   PwrInSEMNomManEn = BG33
+    %   t_PwrInSEMNomMan: AP23:APx
+    %   PwrInSEMNomMan: AQ23:AQx
+    %   PwrInSEMOffNomManEn = BG34
+    %   t_PwrInSEMOffNomMan: AR23:ARx
+    %   PwrInSEMOffNomMan: AS23:ASx
+    %   PwrInREMNomManEn = BG35
+    %   t_PwrInREMNomMan: AT23:ATx
+    %   PwrInREMNomMan: AU23:AUx
+    %   PwrInREMOffNomManEn = BG36
+    %   t_PwrInREMOffNomMan: AV23:AVx
+    %   PwrInREMOffNomMan: AW23:AWx
+    %   PwrInCEMNomManEn = BG37
+    %   t_PwrInCEMNomMan: AX23:AXx
+    %   PwrInCEMNomMan: AY23:AYx
+    %   PwrInCEMOffNomManEn = BG38
+    %   t_PwrInCEMOffNomMan: AZ23:AZx
+    %   PwrInCEMOffNomMan: BA23:BAx
+    %   PwrInPEMNomManEn = BG39
+    %   t_PwrInPEMNomMan: BB23:BBx
+    %   PwrInCEMNomMan: BC23:BCx
+    %   PwrInPEMOffNomManEn = BG40
+    %   t_PwrInPEMOffNomMan: BD23:BDx
+    %   PwrInPEMOffNomMan: BE23:BEx
+    %   EnLimitStop_Prim: BJ21:BJ49
+    %   EnLimitStop_VBV: BM21:BM22
+    %   EnLimitStop_VAFN: BM26:BM27
     
     % Enable Limit Violtation Simulation Halts
-    MWS.In.EnLimitStop_Prim = xlsread(filename,'BJ20:BJ48');
-    MWS.In.EnLimitStop_VBV = xlsread(filename,'BM20:BM21');
-    MWS.In.EnLimitStop_VAFN = xlsread(filename,'BM25:BM26');
+    MWS.In.EnLimitStop_Prim = readmatrix(filename,'Range','BJ21:BJ49');
+    MWS.In.EnLimitStop_VBV = readmatrix(filename,'Range','BM21:BM22');
+    MWS.In.EnLimitStop_VAFN = readmatrix(filename,'Range','BM26:BM27');
 
     % Options
     % -- Hybrid Option (1-Standard Engine, 2-Boost, 3-PEx)
-    MWS.In.Options.HybridConfig = xlsread(filename,'B12:B12'); 
+    MWS.In.Options.HybridConfig = readmatrix(filename,'Range','B12:B12'); 
+    % -- Electric Power System Loss Option (1-No losses (idealisitc), 2-Losses (realistic))
+    MWS.In.Options.EPSLosses = readmatrix(filename,'Range','B13:B13');
     % -- Engine-EM Integration Option (1-Dedicated EM Approach, 2-VEATE Gearbox Approach)
-    MWS.In.Options.EngineEMInt = xlsread(filename,'B13:B13'); 
+    MWS.In.Options.EngineEMInt = readmatrix(filename,'Range','B14:B14'); 
     % -- VEATE Gearbox Configuration Option
     % ---- 1 - HP coupled to sun gear, LP coupled to ring gear
     % ---- 2 - HP coupled to sun gear, LP coupled to carrier
@@ -267,120 +272,176 @@ elseif method == 2 % use input from formated excel file
     % ---- 4 - HP coupled to ring gear, LP coupled to carrier
     % ---- 5 - HP coupled to carrier, LP coupled to sun gear
     % ---- 6 - HP coupled to carrier, LP coupled to ring gear
-    MWS.In.Options.PGBConfig = xlsread(filename,'B14:B14'); 
+    MWS.In.Options.PGBConfig = readmatrix(filename,'Range','B15:B15'); 
     % -- Fuel Flow Transient Logic Option (1-Generic limiter, 2-Ratio Unit Limiter)
-    MWS.In.Options.WfTransientLogic = xlsread(filename,'B15:B15'); 
+    MWS.In.Options.WfTransientLogic = readmatrix(filename,'Range','B16:B16'); 
     % -- Turbine Electrified Energy Managment Option (0-Disable, 1-Enable)
-    MWS.In.Options.TEEM = xlsread(filename,'B16:B16'); 
+    MWS.In.Options.TEEM = readmatrix(filename,'Range','B17:B17'); 
 
     % Engine Input Variables
     % -- Altitude, ft
-    MWS.In.t_Alt = xlsread(filename,'A22:A10022');
-    MWS.In.Alt = xlsread(filename,'B22:B10022');
+    MWS.In.t_Alt = readmatrix(filename,'Range','A23:A10023');
+    MWS.In.t_Alt = MWS.In.t_Alt(~isnan(MWS.In.t_Alt));
+    MWS.In.Alt = readmatrix(filename,'Range','B23:B10023');
+    MWS.In.Alt = MWS.In.Alt(~isnan(MWS.In.Alt));
     % -- Ambient Temperature Difference from Standard Day, degR or degF
-    MWS.In.t_dTamb = xlsread(filename,'C22:C10022');
-    MWS.In.dTamb = xlsread(filename,'D22:D10022');
+    MWS.In.t_dTamb = readmatrix(filename,'Range','C23:C10023');
+    MWS.In.t_dTamb = MWS.In.t_dTamb(~isnan(MWS.In.t_dTamb));
+    MWS.In.dTamb = readmatrix(filename,'Range','D23:D10023');
+    MWS.In.dTamb = MWS.In.dTamb(~isnan(MWS.In.dTamb));
     % -- Mach Number
-    MWS.In.t_MN = xlsread(filename,'E22:E10022');
-    MWS.In.MN = xlsread(filename,'F22:F10022');
+    MWS.In.t_MN = readmatrix(filename,'Range','E23:E10023');
+    MWS.In.t_MN = MWS.In.t_MN(~isnan(MWS.In.t_MN));
+    MWS.In.MN = readmatrix(filename,'Range','F23:F10023');
+    MWS.In.MN = MWS.In.MN(~isnan(MWS.In.MN));
     % -- Aircraft Power Load
-    MWS.In.t_PExAC = xlsread(filename,'G22:G10022');
-    MWS.In.PExAC = xlsread(filename,'H22:H10022');
+    MWS.In.t_PExAC = readmatrix(filename,'Range','G23:G10023');
+    MWS.In.t_PExAC = MWS.In.t_PExAC(~isnan(MWS.In.t_PExAC));
+    MWS.In.PExAC = readmatrix(filename,'Range','H23:H10023');
+    MWS.In.PExAC = MWS.In.PExAC(~isnan(MWS.In.PExAC));
 
     % Control Inputs
     % -- Power Lever Angle, deg
-    MWS.In.t_PLA = xlsread(filename,'J22:J10022');
-    MWS.In.PLA = xlsread(filename,'K22:K10022');
+    MWS.In.t_PLA = readmatrix(filename,'Range','J23:J10023');
+    MWS.In.t_PLA = MWS.In.t_PLA(~isnan(MWS.In.t_PLA));
+    MWS.In.PLA = readmatrix(filename,'Range','K23:K10023');
+    MWS.In.PLA = MWS.In.PLA(~isnan(MWS.In.PLA));
     % -- Boost Toggle
-    MWS.In.t_Boost = xlsread(filename,'L22:L10022');
-    MWS.In.Boost = xlsread(filename,'M22:M10022');
+    MWS.In.t_Boost = readmatrix(filename,'Range','L23:L10023');
+    MWS.In.t_Boost = MWS.In.t_Boost(~isnan(MWS.In.t_Boost));
+    MWS.In.Boost = readmatrix(filename,'Range','M23:M10023');
+    MWS.In.Boost = MWS.In.Boost(~isnan(MWS.In.Boost));
     % -- EPT Toggle
-    MWS.In.t_EPT = xlsread(filename,'N22:N10022');
-    MWS.In.EPT = xlsread(filename,'O22:O10022');
+    MWS.In.t_EPT = readmatrix(filename,'Range','N23:N10023');
+    MWS.In.t_EPT = MWS.In.t_EPT(~isnan(MWS.In.t_EPT));
+    MWS.In.EPT = readmatrix(filename,'Range','O23:O10023');
+    MWS.In.EPT = MWS.In.EPT(~isnan(MWS.In.EPT));
     % --- Charging Toggle
-    MWS.In.t_Charge = xlsread(filename,'P22:P10022');;
-    MWS.In.Charge = xlsread(filename,'Q22:Q10022');;
+    MWS.In.t_Charge = readmatrix(filename,'Range','P23:P10023');
+    MWS.In.t_Charge = MWS.In.t_Charge(~isnan(MWS.In.t_Charge));
+    MWS.In.Charge = readmatrix(filename,'Range','Q23:Q10023');
+    MWS.In.Charge = MWS.In.Charge(~isnan(MWS.In.Charge));
     % -- Manual Control Inputs
     % ---- Corrected Fan Speed Command, rpm
-    MWS.In.N1cManEn = xlsread(filename,'BG20:BG20'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_N1cMan = xlsread(filename,'R22:R10022'); 
-    MWS.In.N1cMan = xlsread(filename,'S22:S10022');
+    MWS.In.N1cManEn = readmatrix(filename,'Range','BG21:BG21'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_N1cMan = readmatrix(filename,'Range','R23:R10023'); 
+    MWS.In.t_N1cMan = MWS.In.t_N1cMan(~isnan(MWS.In.t_N1cMan));
+    MWS.In.N1cMan = readmatrix(filename,'Range','S23:S10023');
+    MWS.In.N1cMan = MWS.In.N1cMan(~isnan(MWS.In.N1cMan));
     % ---- Fuel Flow, lbm/s
-    MWS.In.WfManEn = xlsread(filename,'BG21:BG21'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_WfMan = xlsread(filename,'T22:T10022'); 
-    MWS.In.WfMan = xlsread(filename,'U22:U10022');
+    MWS.In.WfManEn = readmatrix(filename,'Range','BG22:BG22'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_WfMan = readmatrix(filename,'Range','T23:T10023'); 
+    MWS.In.t_WfMan = MWS.In.t_WfMan(~isnan(MWS.In.t_WfMan));
+    MWS.In.WfMan = readmatrix(filename,'Range','U23:U10023');
+    MWS.In.WfMan = MWS.In.WfMan(~isnan(MWS.In.WfMan));
     % ---- Variable bleed valve, frac. open
-    MWS.In.VBVManEn = xlsread(filename,'BG22:BG22'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_VBVMan = xlsread(filename,'V22:V10022');
-    MWS.In.VBVMan = xlsread(filename,'W22:W10022');
+    MWS.In.VBVManEn = readmatrix(filename,'Range','BG23:BG23'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_VBVMan = readmatrix(filename,'Range','V23:V10023');
+    MWS.In.t_VBVMan = MWS.In.t_VBVMan(~isnan(MWS.In.t_VBVMan));
+    MWS.In.VBVMan = readmatrix(filename,'Range','W23:W10023');
+    MWS.In.VBVMan = MWS.In.VBVMan(~isnan(MWS.In.VBVMan));
     % ---- Variable area fan nozzle, sqin
-    MWS.In.VAFNManEn = xlsread(filename,'BG23:BG23'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_VAFNMan = xlsread(filename,'X22:X10022');
-    MWS.In.VAFNMan = xlsread(filename,'Y22:Y10022');
+    MWS.In.VAFNManEn = readmatrix(filename,'Range','BG24:BG24'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_VAFNMan = readmatrix(filename,'Range','X23:X10023');
+    MWS.In.t_VAFNMan = MWS.In.t_VAFNMan(~isnan(MWS.In.t_VAFNMan));
+    MWS.In.VAFNMan = readmatrix(filename,'Range','Y23:Y10023');
+    MWS.In.VAFNMan = MWS.In.VAFNMan(~isnan(MWS.In.VAFNMan));
     % ---- LPS Additional Power (nominal), hp
-    MWS.In.PwrInLPNomManEn = xlsread(filename,'BG24:BG24'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_PwrInLPNomMan = xlsread(filename,'Z22:Z10022');
-    MWS.In.PwrInLPNomMan = xlsread(filename,'AA22:AA10022');
+    MWS.In.PwrInLPNomManEn = readmatrix(filename,'Range','BG25:BG25'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_PwrInLPNomMan = readmatrix(filename,'Range','Z23:Z10023');
+    MWS.In.t_PwrInLPNomMan = MWS.In.t_PwrInLPNomMan(~isnan(MWS.In.t_PwrInLPNomMan));
+    MWS.In.PwrInLPNomMan = readmatrix(filename,'Range','AA23:AA10023');
+    MWS.In.PwrInLPNomMan = MWS.In.PwrInLPNomMan(~isnan(MWS.In.PwrInLPNomMan));
     % ---- LPS Additional Power (off-nominal), hp
-    MWS.In.PwrInLPOffNomManEn = xlsread(filename,'BG25:BG25'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_PwrInLPOffNomMan = xlsread(filename,'AB22:AB10022');
-    MWS.In.PwrInLPOffNomMan = xlsread(filename,'AC22:AC10022');
+    MWS.In.PwrInLPOffNomManEn = readmatrix(filename,'Range','BG26:BG26'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_PwrInLPOffNomMan = readmatrix(filename,'Range','AB23:AB10023');
+    MWS.In.t_PwrInLPOffNomMan = MWS.In.t_PwrInLPOffNomMan(~isnan(MWS.In.t_PwrInLPOffNomMan));
+    MWS.In.PwrInLPOffNomMan = readmatrix(filename,'Range','AC23:AC10023');
+    MWS.In.PwrInLPOffNomMan = MWS.In.PwrInLPOffNomMan(~isnan(MWS.In.PwrInLPOffNomMan));
     % ---- HPS Additional Power (nominal), hp
-    MWS.In.PwrInHPNomManEn = xlsread(filename,'BG26:BG26'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_PwrInHPNomMan = xlsread(filename,'AD22:AD10022'); 
-    MWS.In.PwrInHPNomMan = xlsread(filename,'AE22:AE10022');
+    MWS.In.PwrInHPNomManEn = readmatrix(filename,'Range','BG27:BG27'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_PwrInHPNomMan = readmatrix(filename,'Range','AD23:AD10023'); 
+    MWS.In.t_PwrInHPNomMan = MWS.In.t_PwrInHPNomMan(~isnan(MWS.In.t_PwrInHPNomMan));
+    MWS.In.PwrInHPNomMan = readmatrix(filename,'Range','AE23:AE10023');
+    MWS.In.PwrInHPNomMan = MWS.In.PwrInHPNomMan(~isnan(MWS.In.PwrInHPNomMan));
     % ---- HPS Additional Power (off-nominal), hp
-    MWS.In.PwrInHPOffNomManEn = xlsread(filename,'BG27:BG27'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_PwrInHPOffNomMan = xlsread(filename,'AF22:AF10022'); 
-    MWS.In.PwrInHPOffNomMan = xlsread(filename,'AG22:AG10022');
+    MWS.In.PwrInHPOffNomManEn = readmatrix(filename,'Range','BG28:BG28'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_PwrInHPOffNomMan = readmatrix(filename,'Range','AF23:AF10023'); 
+    MWS.In.t_PwrInHPOffNomMan = MWS.In.t_PwrInHPOffNomMan(~isnan(MWS.In.t_PwrInHPOffNomMan));
+    MWS.In.PwrInHPOffNomMan = readmatrix(filename,'Range','AG23:AG10023');
+    MWS.In.PwrInHPOffNomMan = MWS.In.PwrInHPOffNomMan(~isnan(MWS.In.PwrInHPOffNomMan));
     % ---- LPS Electric Machine (nominal), hp
-    MWS.In.PwrInLPEMNomManEn = xlsread(filename,'BG28:BG28'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_PwrInLPEMNomMan = xlsread(filename,'AH22:AH10022');
-    MWS.In.PwrInLPEMNomMan = xlsread(filename,'AI22:AI10022');
+    MWS.In.PwrInLPEMNomManEn = readmatrix(filename,'Range','BG29:BG29'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_PwrInLPEMNomMan = readmatrix(filename,'Range','AH23:AH10023');
+    MWS.In.t_PwrInLPEMNomMan = MWS.In.t_PwrInLPEMNomMan(~isnan(MWS.In.t_PwrInLPEMNomMan));
+    MWS.In.PwrInLPEMNomMan = readmatrix(filename,'Range','AI23:AI10023');
+    MWS.In.PwrInLPEMNomMan = MWS.In.PwrInLPEMNomMan(~isnan(MWS.In.PwrInLPEMNomMan));
     % ---- LPS Electric Machine (off-nominal), hp
-    MWS.In.PwrInLPEMOffNomManEn = xlsread(filename,'BG29:BG29'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_PwrInLPEMOffNomMan = xlsread(filename,'AJ22:AJ10022');
-    MWS.In.PwrInLPEMOffNomMan = xlsread(filename,'AK22:AK10022');
+    MWS.In.PwrInLPEMOffNomManEn = readmatrix(filename,'Range','BG30:BG30'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_PwrInLPEMOffNomMan = readmatrix(filename,'Range','AJ23:AJ10023');
+    MWS.In.t_PwrInLPEMOffNomMan = MWS.In.t_PwrInLPEMOffNomMan(~isnan(MWS.In.t_PwrInLPEMOffNomMan));
+    MWS.In.PwrInLPEMOffNomMan = readmatrix(filename,'Range','AK23:AK10023');
+    MWS.In.PwrInLPEMOffNomMan = MWS.In.PwrInLPEMOffNomMan(~isnan(MWS.In.PwrInLPEMOffNomMan));
     % ---- HPS Electric Machine (nominal), hp
-    MWS.In.PwrInHPEMNomManEn = xlsread(filename,'BG30:BG30'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_PwrInHPEMNomMan = xlsread(filename,'AL22:AL10022'); 
-    MWS.In.PwrInHPEMNomMan = xlsread(filename,'AM22:AM10022');
+    MWS.In.PwrInHPEMNomManEn = readmatrix(filename,'Range','BG31:BG31'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_PwrInHPEMNomMan = readmatrix(filename,'Range','AL23:AL10023'); 
+    MWS.In.t_PwrInHPEMNomMan = MWS.In.t_PwrInHPEMNomMan(~isnan(MWS.In.t_PwrInHPEMNomMan));
+    MWS.In.PwrInHPEMNomMan = readmatrix(filename,'Range','AM23:AM10023');
+    MWS.In.PwrInHPEMNomMan = MWS.In.PwrInHPEMNomMan(~isnan(MWS.In.PwrInHPEMNomMan));
     % ---- HPS Electric Machine (off-nominal), hp
-    MWS.In.PwrInHPEMOffNomManEn = xlsread(filename,'BG31:BG31'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_PwrInHPEMOffNomMan = xlsread(filename,'AN22:AN10022'); 
-    MWS.In.PwrInHPEMOffNomMan = xlsread(filename,'AO22:AO10022');
+    MWS.In.PwrInHPEMOffNomManEn = readmatrix(filename,'Range','BG32:BG32'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_PwrInHPEMOffNomMan = readmatrix(filename,'Range','AN23:AN10023'); 
+    MWS.In.t_PwrInHPEMOffNomMan = MWS.In.t_PwrInHPEMOffNomMan(~isnan(MWS.In.t_PwrInHPEMOffNomMan));
+    MWS.In.PwrInHPEMOffNomMan = readmatrix(filename,'Range','AO23:AO10023');
+    MWS.In.PwrInHPEMOffNomMan = MWS.In.PwrInHPEMOffNomMan(~isnan(MWS.In.PwrInHPEMOffNomMan));
     % ---- Sun Gear Electric Machine (nominal), hp
-    MWS.In.PwrInSEMNomManEn = xlsread(filename,'BG32:BG32'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_PwrInSEMNomMan = xlsread(filename,'AP22:AP10022'); 
-    MWS.In.PwrInSEMNomMan = xlsread(filename,'AQ22:AQ10022');
+    MWS.In.PwrInSEMNomManEn = readmatrix(filename,'Range','BG33:BG33'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_PwrInSEMNomMan = readmatrix(filename,'Range','AP23:AP10023'); 
+    MWS.In.t_PwrInSEMNomMan = MWS.In.t_PwrInSEMNomMan(~isnan(MWS.In.t_PwrInSEMNomMan));
+    MWS.In.PwrInSEMNomMan = readmatrix(filename,'Range','AQ23:AQ10023');
+    MWS.In.PwrInSEMNomMan = MWS.In.PwrInSEMNomMan(~isnan(MWS.In.PwrInSEMNomMan));
     % ---- Sun Gear Electric Machine (off-nominal), hp
-    MWS.In.PwrInSEMOffNomManEn = xlsread(filename,'BG33:BG33'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_PwrInSEMOffNomMan = xlsread(filename,'AR22:AR10022'); 
-    MWS.In.PwrInSEMOffNomMan = xlsread(filename,'AS22:AS10022');
+    MWS.In.PwrInSEMOffNomManEn = readmatrix(filename,'Range','BG34:BG34'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_PwrInSEMOffNomMan = readmatrix(filename,'Range','AR23:AR10023'); 
+    MWS.In.t_PwrInSEMOffNomMan = MWS.In.t_PwrInSEMOffNomMan(~isnan(MWS.In.t_PwrInSEMOffNomMan));
+    MWS.In.PwrInSEMOffNomMan = readmatrix(filename,'Range','AS23:AS10023');
+    MWS.In.PwrInSEMOffNomMan = MWS.In.PwrInSEMOffNomMan(~isnan(MWS.In.PwrInSEMOffNomMan));
     % ---- Ring Gear Electric Machine (nominal), hp
-    MWS.In.PwrInREMNomManEn = xlsread(filename,'BG34:BG34'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_PwrInREMNomMan = xlsread(filename,'AT22:AT10022'); 
-    MWS.In.PwrInREMNomMan = xlsread(filename,'AU22:AU10022');
+    MWS.In.PwrInREMNomManEn = readmatrix(filename,'Range','BG35:BG35'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_PwrInREMNomMan = readmatrix(filename,'Range','AT23:AT10023'); 
+    MWS.In.t_PwrInREMNomMan = MWS.In.t_PwrInREMNomMan(~isnan(MWS.In.t_PwrInREMNomMan));
+    MWS.In.PwrInREMNomMan = readmatrix(filename,'Range','AU23:AU10023');
+    MWS.In.PwrInREMNomMan = MWS.In.PwrInREMNomMan(~isnan(MWS.In.PwrInREMNomMan));
     % ---- Ring Gear Electric Machine (off-nominal), hp
-    MWS.In.PwrInREMOffNomManEn = xlsread(filename,'BG35:BG35'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_PwrInREMOffNomMan = xlsread(filename,'AV22:AV10022'); 
-    MWS.In.PwrInREMOffNomMan = xlsread(filename,'AW22:AW10022');
+    MWS.In.PwrInREMOffNomManEn = readmatrix(filename,'Range','BG36:BG36'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_PwrInREMOffNomMan = readmatrix(filename,'Range','AV23:AV10023'); 
+    MWS.In.t_PwrInREMOffNomMan = MWS.In.t_PwrInREMOffNomMan(~isnan(MWS.In.t_PwrInREMOffNomMan));
+    MWS.In.PwrInREMOffNomMan = readmatrix(filename,'Range','AW23:AW10023');
+    MWS.In.PwrInREMOffNomMan = MWS.In.PwrInREMOffNomMan(~isnan(MWS.In.PwrInREMOffNomMan));
     % ---- Carrier Electric Machine (nominal), hp
-    MWS.In.PwrInCEMNomManEn = xlsread(filename,'BG36:BG36'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_PwrInCEMNomMan = xlsread(filename,'AX22:AX10022'); 
-    MWS.In.PwrInCEMNomMan = xlsread(filename,'AY22:AY10022');
+    MWS.In.PwrInCEMNomManEn = readmatrix(filename,'Range','BG37:BG37'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_PwrInCEMNomMan = readmatrix(filename,'Range','AX23:AX10023'); 
+    MWS.In.t_PwrInCEMNomMan = MWS.In.t_PwrInCEMNomMan(~isnan(MWS.In.t_PwrInCEMNomMan));
+    MWS.In.PwrInCEMNomMan = readmatrix(filename,'Range','AY23:AY10023');
+    MWS.In.PwrInCEMNomMan = MWS.In.PwrInCEMNomMan(~isnan(MWS.In.PwrInCEMNomMan));
     % ---- Carrier Electric Machine (off-nominal), hp
-    MWS.In.PwrInCEMOffNomManEn = xlsread(filename,'BG37:BG37'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_PwrInCEMOffNomMan = xlsread(filename,'AZ22:AZ10022'); 
-    MWS.In.PwrInCEMOffNomMan = xlsread(filename,'BA22:BA10022');
+    MWS.In.PwrInCEMOffNomManEn = readmatrix(filename,'Range','BG38:BG38'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_PwrInCEMOffNomMan = readmatrix(filename,'Range','AZ23:AZ10023'); 
+    MWS.In.t_PwrInCEMOffNomMan = MWS.In.t_PwrInCEMOffNomMan(~isnan(MWS.In.t_PwrInCEMOffNomMan));
+    MWS.In.PwrInCEMOffNomMan = readmatrix(filename,'Range','BA23:BA10023');
+    MWS.In.PwrInCEMOffNomMan = MWS.In.PwrInCEMOffNomMan(~isnan(MWS.In.PwrInCEMOffNomMan));
     % ---- Planet Gear Electric Machine (nominal), hp
-    MWS.In.PwrInPEMNomManEn = xlsread(filename,'BG38:BG38'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_PwrInPEMNomMan = xlsread(filename,'BB22:BB10022'); 
-    MWS.In.PwrInPEMNomMan = xlsread(filename,'BC22:BC10022');
+    MWS.In.PwrInPEMNomManEn = readmatrix(filename,'Range','BG39:BG39'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_PwrInPEMNomMan = readmatrix(filename,'Range','BB23:BB10023'); 
+    MWS.In.t_PwrInPEMNomMan = MWS.In.t_PwrInPEMNomMan(~isnan(MWS.In.t_PwrInPEMNomMan));
+    MWS.In.PwrInPEMNomMan = readmatrix(filename,'Range','BC23:BC10023');
+    MWS.In.PwrInPEMNomMan = MWS.In.PwrInPEMNomMan(~isnan(MWS.In.PwrInPEMNomMan));
     % ---- Planet Gear Electric Machine (off-nominal), hp
-    MWS.In.PwrInPEMOffNomManEn = xlsread(filename,'BG39:BG39'); % 0-use control loop, 1-use manual prescription
-    MWS.In.t_PwrInPEMOffNomMan = xlsread(filename,'BD22:BD10022'); 
-    MWS.In.PwrInPEMOffNomMan = xlsread(filename,'BE22:BE10022');
+    MWS.In.PwrInPEMOffNomManEn = readmatrix(filename,'Range','BG40:BG40'); % 0-use control loop, 1-use manual prescription
+    MWS.In.t_PwrInPEMOffNomMan = readmatrix(filename,'Range','BD23:BD10023'); 
+    MWS.In.t_PwrInPEMOffNomMan = MWS.In.t_PwrInPEMOffNomMan(~isnan(MWS.In.t_PwrInPEMOffNomMan));
+    MWS.In.PwrInPEMOffNomMan = readmatrix(filename,'Range','BE23:BE10023');
+    MWS.In.PwrInPEMOffNomMan = MWS.In.PwrInPEMOffNomMan(~isnan(MWS.In.PwrInPEMOffNomMan));
 
 else % use default inputs
     
@@ -392,6 +453,7 @@ else % use default inputs
     % Options
     % -- Hybrid Option (1-Standard Engine, 2-Boost, 3-PEx)
     MWS.In.Options.HybridConfig = 1; 
+    
     % -- Engine-EM Integration Option (1-Dedicated EM Approach, 2-VEATE Gearbox Approach)
     MWS.In.Options.EngineEMInt = 1;
     % -- VEATE Gearbox Configuration Option

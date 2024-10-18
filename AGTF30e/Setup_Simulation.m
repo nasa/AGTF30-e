@@ -1,4 +1,4 @@
-function MWS = Setup_Simulation(inputMethod,In,filename,Mdl,SSsolverSP,dem,veate)
+function MWS = Setup_Simulation(inputMethod,In,filename,Mdl,SSsolverSP)
 %Setup_Simulation Summary
 %   Written By: Jonathan Kratz
 %   Date: 11/20/2019
@@ -18,43 +18,6 @@ function MWS = Setup_Simulation(inputMethod,In,filename,Mdl,SSsolverSP,dem,veate
 %           used to defined input profiles)
 %       Mdl - Model Selection: 0 - Steady-State, 1 - Dynamic, 2 - Linearization
 %       SSsolverSP - steady-state set-point (1 - drive to set N1c, 2 - drive to set T4, 3 - drive to set Fn)
-%       dem - Empty array or structure with parameters that define the
-%           dedicated electric machine approach implementation. Structure
-%           variables are given below:
-%           dem.LPSGB.GR = Gear ratio between LPS EM and the LPS (NemL/Nlps)
-%           dem.HPSGB.GR = Gear ratio between HPS EM and the HPS (NemH/Nhps)
-%       veate - Empty array or structure with parameters that define the
-%           Versatile Electrically Augmented Turbine Engine (VEATE) 
-%           approach implementation. Structure variables are given below:
-%           veate.CouplingEMPwr = max continuous power of the coupling EM
-%           veate.Sun.GR_int = gear ratio between the spool or EM and an 
-%               intermediate shaft to which the EM is attached
-%               (NemS/Nspool)
-%           veate.Sun.GR_gb = gear ratio between the gearbox component and
-%               the intermediate shaft / EM. 
-%               (NS/NemS)
-%           veate.Sun.r = gear radius, ft
-%           veate.Sun.J_go = inertia of the gear alone, slug-ft2
-%           veate.Ring.GR_int = gear ratio between the spool or EM and an 
-%               intermediate shaft to which the EM is attached
-%               (NemR/Nspool)
-%           veate.Ring.GR_gb = gear ratio between the gearbox component and
-%               the intermediate shaft / EM. 
-%               (NR/NemR)
-%           veate.Ring.r = gear radius, ft
-%           veate.Ring.J_go = inertia of the gear alone, slug-ft2
-%           veate.Carrier.GR_int = gear ratio between the spool or EM and an 
-%               intermediate shaft to which the EM is attached
-%               (NemC/Nspool)
-%           veate.Carrier.GR_gb = gear ratio between the gearbox component and
-%               the intermediate shaft / EM. 
-%               (NC/NemC)
-%           veate.Carrier.J_go = inertia of the gear alone, slug-ft2
-%           veate.Planet.GR_gb = gear ratio between the planet and any
-%               motor that might be attached to it
-%           veate.Planet.nP = number of planets
-%           veate.Planet.mP = mass of planet, slug
-%           veate.Planet.J_go = inertia of the gear alone, slug-ft2
 %   Outputs:
 %       MWS - Matlab Workspace Structure with all model parameters
 
@@ -65,6 +28,7 @@ addpath(genpath([cd,'/SimSetup']));
 dir = cd;
 cd ..
 addpath(genpath([cd,'/TMATS']))
+addpath(genpath([cd,'/EMTAT-1.3.2']))
 cd(dir);
 
 % Change directory to SimulationSetup folder -----------------------------%
@@ -74,8 +38,9 @@ cd([cd,'/SimSetup'])
 % Load Engine Bus --------------------------------------------------------%
 
 load('Eng_Bus.mat')
+load('SuppSys_Bus.mat')
 
-% Assign MWS and Eng_Bus Elements to base workspace ----------------------%
+% Assign MWS, Eng_Bus, and SuppSys Elements to base workspace ------------%
 
 MWS = [];
 % MWS
@@ -140,6 +105,26 @@ assignin('base','S7',S7);
 assignin('base','Shaft',Shaft)
 % -- SM
 assignin('base','SM',SM)
+% -- SuppSys_Bus
+assignin('base','SuppSys_Bus',SupplySys)
+% % -- Bus_Pwr
+% assignin('base','Bus_Pwr',Bus_Pwr)
+% % -- DCDC_Pwr
+% assignin('base','DCDC_Pwr',DCDC_Pwr)
+% % -- SuppCable_Pwr
+% assignin('base','SuppCable_Pwr',SuppCable_Pwr)
+% % -- ESD_Pwr
+% assignin('base','ESD_Pwr',ESD_Pwr)
+% % -- V_Bus
+% assignin('base','V_Bus',V_Bus)
+% % -- V_ESD
+% assignin('base','V_ESD',V_ESD)
+% % -- I_Bus
+% assignin('base','I_Bus',I_Bus)
+% % -- I_Load
+% assignin('base','I_Load',I_Load)
+% % -- I_ESD
+% assignin('base','I_ESD',I_ESD)
 
 % Inputs -----------------------------------------------------------------%
 
@@ -150,9 +135,9 @@ end
 
 % Engine -----------------------------------------------------------------%
 
-MWS = setup_AllEng(MWS,dem,veate);	   % develops inputs for engine simulation
-                                       % includes sensor and actuator setup
-                                       
+MWS = setup_AllEng(MWS);	   % develops inputs for engine simulation
+                               % includes sensor and actuator setup
+
 % Controller -------------------------------------------------------------%
 
 MWS = setup_Controller(MWS);   % develops inputs for engine controller

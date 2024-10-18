@@ -6,6 +6,7 @@ function MWS = setup_Controller(MWS)
 % Steady-State Data
 load([cd,'\Data\data_Trim_HPPwrEx.mat']); % loads dataTrim_HPPwrEx
 load([cd,'\Data\data_Trim_HPPwrIn.mat']); % loads dataTrim_HPPwrIn
+
 % Consolidate steady-state data
 dataTrim.Alt_vec = dataTrim_HPPwrIn.Alt_vec;
 dataTrim.MN_vec = dataTrim_HPPwrIn.MN_vec;
@@ -109,7 +110,7 @@ dataTrim.Err(:,:,:,:,8:14) = dataTrim_HPPwrIn.Err;
 dataTrim.Success(:,:,:,:,1:7) = dataTrim_HPPwrEx.Success;
 dataTrim.Success(:,:,:,:,8:14) = dataTrim_HPPwrIn.Success;
 
-% Power Extractio Schedule
+% Power Extraction Schedule
 load([cd,'\Data\data_Cntrl_PExSch.mat']); %loads dataPEx
 
 % Control Gains
@@ -260,23 +261,69 @@ MWS.Cntrl.Hyb.PEx.PwrSplitSched.PwrFracHP_array = dataPEx.PwrFracHP;
 % N1c = f(PL,Alt,MN,PwrInLP,PwrInHP)
 MWS.Cntrl.WfCntrl.Sched.N1cSP.N1cSP_array = dataTrim.N1c;
 
-% PI control gains
-MWS.Cntrl.WfCntrl.Nom.Kp_array = zeros(length(Nom.Cntrl.PL_vec),length(Nom.Cntrl.Alt_vec),length(Nom.Cntrl.MN_vec),length(Nom.Cntrl.PwrInLP_vec),length(Nom.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
-MWS.Cntrl.WfCntrl.Nom.Ki_array = zeros(length(Nom.Cntrl.PL_vec),length(Nom.Cntrl.Alt_vec),length(Nom.Cntrl.MN_vec),length(Nom.Cntrl.PwrInLP_vec),length(Nom.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
-for m = 1:length(Nom.Cntrl.PL_vec)
-    for i = 1:length(Nom.Cntrl.Alt_vec)
-        for j = 1:length(Nom.Cntrl.MN_vec)
-            for k = 1:length(Nom.Cntrl.PwrInLP_vec)
-                for l = 1:length(Nom.Cntrl.PwrInHP_vec)
-                    Kp_array = permute(Nom.Cntrl.Kp(m,i,j,k,l,:,:),[6,7,1,2,3,4,5]);
-                    Ki_array = permute(Nom.Cntrl.Ki(m,i,j,k,l,:,:),[6,7,1,2,3,4,5]);
-                    MWS.Cntrl.WfCntrl.Nom.Kp_array(m,i,j,k,l) = interp2(Nom.Cntrl.Jhps_vec,Nom.Cntrl.Jlps_vec,Kp_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
-                    MWS.Cntrl.WfCntrl.Nom.Ki_array(m,i,j,k,l) = interp2(Nom.Cntrl.Jhps_vec,Nom.Cntrl.Jlps_vec,Ki_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
-                end
-            end
-        end
+% Find indices of inertias for look-up
+pass1 = 0;
+for i = 1:length(Nom.Cntrl.Jhps_vec)-1
+    if MWS.Shaft.JhpsEff >= Nom.Cntrl.Jhps_vec(i) && MWS.Shaft.JhpsEff <= Nom.Cntrl.Jhps_vec(i+1)
+        idxJhpsLow = i;
+        idxJhpsHi = i+1;
+        pass1 = 1;
+        break;
     end
 end
+if pass1 == 0
+    disp('Error in setup_Controller.m: MWS.Shaft.JhpsEff is outside range of HPS inertias.')
+end
+pass2 = 0;
+for i = 1:length(Nom.Cntrl.Jlps_vec)-1
+    if MWS.Shaft.JlpsEff >= Nom.Cntrl.Jlps_vec(i) && MWS.Shaft.JlpsEff <= Nom.Cntrl.Jlps_vec(i+1)
+        idxJlpsLow = i;
+        idxJlpsHi = i+1;
+        pass2 = 1;
+        break;
+    end
+end
+if pass2 == 0
+    disp('Error in setup_Controller.m: MWS.Shaft.JhpsEff is outside range of HPS inertias.')
+end
+
+% PI control (used later with limiter controllers as well)
+JhpsL = Nom.Cntrl.Jhps_vec(idxJhpsLow);
+JhpsH = Nom.Cntrl.Jhps_vec(idxJhpsHi);
+JlpsL = Nom.Cntrl.Jlps_vec(idxJlpsLow);
+JlpsH = Nom.Cntrl.Jlps_vec(idxJlpsHi);
+% Propotional
+Kp_LL = Nom.Cntrl.Kp(:,:,:,:,:,idxJhpsLow,idxJlpsLow);
+Kp_LH = Nom.Cntrl.Kp(:,:,:,:,:,idxJhpsLow,idxJlpsHi);
+Kp_HL = Nom.Cntrl.Kp(:,:,:,:,:,idxJhpsHi,idxJlpsLow);
+Kp_HH = Nom.Cntrl.Kp(:,:,:,:,:,idxJhpsHi,idxJlpsHi);
+Kp1 = Kp_LL*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Kp_HL*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+Kp2 = Kp_LH*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Kp_HH*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+MWS.Cntrl.WfCntrl.Nom.Kp_array = Kp1*(JlpsH-MWS.Shaft.JlpsEff)/(JlpsH-JlpsL) + Kp2*(MWS.Shaft.JlpsEff-JlpsL)/(JlpsH-JlpsL);
+% Integral
+Ki_LL = Nom.Cntrl.Ki(:,:,:,:,:,idxJhpsLow,idxJlpsLow);
+Ki_LH = Nom.Cntrl.Ki(:,:,:,:,:,idxJhpsLow,idxJlpsHi);
+Ki_HL = Nom.Cntrl.Ki(:,:,:,:,:,idxJhpsHi,idxJlpsLow);
+Ki_HH = Nom.Cntrl.Ki(:,:,:,:,:,idxJhpsHi,idxJlpsHi);
+Ki1 = Ki_LL*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Ki_HL*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+Ki2 = Ki_LH*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Ki_HH*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+MWS.Cntrl.WfCntrl.Nom.Ki_array = Ki1*(JlpsH-MWS.Shaft.JlpsEff)/(JlpsH-JlpsL) + Ki2*(MWS.Shaft.JlpsEff-JlpsL)/(JlpsH-JlpsL); 
+% MWS.Cntrl.WfCntrl.Nom.Kp_array = zeros(length(Nom.Cntrl.PL_vec),length(Nom.Cntrl.Alt_vec),length(Nom.Cntrl.MN_vec),length(Nom.Cntrl.PwrInLP_vec),length(Nom.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
+% MWS.Cntrl.WfCntrl.Nom.Ki_array = zeros(length(Nom.Cntrl.PL_vec),length(Nom.Cntrl.Alt_vec),length(Nom.Cntrl.MN_vec),length(Nom.Cntrl.PwrInLP_vec),length(Nom.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
+% for m = 1:length(Nom.Cntrl.PL_vec)
+%     for i = 1:length(Nom.Cntrl.Alt_vec)
+%         for j = 1:length(Nom.Cntrl.MN_vec)
+%             for k = 1:length(Nom.Cntrl.PwrInLP_vec)
+%                 for l = 1:length(Nom.Cntrl.PwrInHP_vec)
+%                     Kp_array = permute(Nom.Cntrl.Kp(m,i,j,k,l,:,:),[6,7,1,2,3,4,5]);
+%                     Ki_array = permute(Nom.Cntrl.Ki(m,i,j,k,l,:,:),[6,7,1,2,3,4,5]);
+%                     MWS.Cntrl.WfCntrl.Nom.Kp_array(m,i,j,k,l) = interp2(Nom.Cntrl.Jhps_vec,Nom.Cntrl.Jlps_vec,Kp_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
+%                     MWS.Cntrl.WfCntrl.Nom.Ki_array(m,i,j,k,l) = interp2(Nom.Cntrl.Jhps_vec,Nom.Cntrl.Jlps_vec,Ki_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
+%                 end
+%             end
+%         end
+%     end
+% end
 MWS.Cntrl.WfCntrl.Nom.Kiwp = 1296/1.46;
 
 % Set-Point Limit Controllers --------------------------------------------%
@@ -290,115 +337,217 @@ MWS.Cntrl.WfCntrl.N1cSPLim.En = [1 0 1 1 1 1 1];
 % -- Set-Point
 MWS.Cntrl.WfCntrl.N1Max.SP = 2203.5;
 % -- PI Control Gains
-MWS.Cntrl.WfCntrl.N1Max.Kp_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
-MWS.Cntrl.WfCntrl.N1Max.Ki_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
-for i = 1:length(WfLimMax.Cntrl.Alt_vec)
-    for j = 1:length(WfLimMax.Cntrl.MN_vec)
-        for k = 1:length(WfLimMax.Cntrl.PwrInLP_vec)
-            for l = 1:length(WfLimMax.Cntrl.PwrInHP_vec)
-                Kp_array = permute(WfLimMax.Cntrl.N1.Kp(i,j,k,l,:,:),[5,6,1,2,3,4]);
-                Ki_array = permute(WfLimMax.Cntrl.N1.Ki(i,j,k,l,:,:),[5,6,1,2,3,4]);
-                MWS.Cntrl.WfCntrl.N1Max.Kp_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Kp_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
-                MWS.Cntrl.WfCntrl.N1Max.Ki_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Ki_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
-            end
-        end
-    end
-end
+clear Kp_LL Kp_LH Kp_HL Kp_HH Ki_LL Ki_LH Ki_HL Ki_HH Kp1 Kp2 Ki1 Ki2
+% Propotional
+Kp_LL = WfLimMax.Cntrl.N1.Kp(:,:,:,:,idxJhpsLow,idxJlpsLow);
+Kp_LH = WfLimMax.Cntrl.N1.Kp(:,:,:,:,idxJhpsLow,idxJlpsHi);
+Kp_HL = WfLimMax.Cntrl.N1.Kp(:,:,:,:,idxJhpsHi,idxJlpsLow);
+Kp_HH = WfLimMax.Cntrl.N1.Kp(:,:,:,:,idxJhpsHi,idxJlpsHi);
+Kp1 = Kp_LL*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Kp_HL*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+Kp2 = Kp_LH*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Kp_HH*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+MWS.Cntrl.WfCntrl.N1Max.Kp_array = Kp1*(JlpsH-MWS.Shaft.JlpsEff)/(JlpsH-JlpsL) + Kp2*(MWS.Shaft.JlpsEff-JlpsL)/(JlpsH-JlpsL);
+% Integral
+Ki_LL = WfLimMax.Cntrl.N1.Ki(:,:,:,:,idxJhpsLow,idxJlpsLow);
+Ki_LH = WfLimMax.Cntrl.N1.Ki(:,:,:,:,idxJhpsLow,idxJlpsHi);
+Ki_HL = WfLimMax.Cntrl.N1.Ki(:,:,:,:,idxJhpsHi,idxJlpsLow);
+Ki_HH = WfLimMax.Cntrl.N1.Ki(:,:,:,:,idxJhpsHi,idxJlpsHi);
+Ki1 = Ki_LL*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Ki_HL*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+Ki2 = Ki_LH*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Ki_HH*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+MWS.Cntrl.WfCntrl.N1Max.Ki_array = Ki1*(JlpsH-MWS.Shaft.JlpsEff)/(JlpsH-JlpsL) + Ki2*(MWS.Shaft.JlpsEff-JlpsL)/(JlpsH-JlpsL); 
+% MWS.Cntrl.WfCntrl.N1Max.Kp_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
+% MWS.Cntrl.WfCntrl.N1Max.Ki_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
+% for i = 1:length(WfLimMax.Cntrl.Alt_vec)
+%     for j = 1:length(WfLimMax.Cntrl.MN_vec)
+%         for k = 1:length(WfLimMax.Cntrl.PwrInLP_vec)
+%             for l = 1:length(WfLimMax.Cntrl.PwrInHP_vec)
+%                 Kp_array = permute(WfLimMax.Cntrl.N1.Kp(i,j,k,l,:,:),[5,6,1,2,3,4]);
+%                 Ki_array = permute(WfLimMax.Cntrl.N1.Ki(i,j,k,l,:,:),[5,6,1,2,3,4]);
+%                 MWS.Cntrl.WfCntrl.N1Max.Kp_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Kp_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
+%                 MWS.Cntrl.WfCntrl.N1Max.Ki_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Ki_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
+%             end
+%         end
+%     end
+% end
 MWS.Cntrl.WfCntrl.N1Max.Kiwp = 1252/1296;
 % N3 Max Limiter
 % -- Set-Point
 MWS.Cntrl.WfCntrl.N3Max.SP = 23549;
 % -- PI Control Gains
-MWS.Cntrl.WfCntrl.N3Max.Kp_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
-MWS.Cntrl.WfCntrl.N3Max.Ki_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
-for i = 1:length(WfLimMax.Cntrl.Alt_vec)
-    for j = 1:length(WfLimMax.Cntrl.MN_vec)
-        for k = 1:length(WfLimMax.Cntrl.PwrInLP_vec)
-            for l = 1:length(WfLimMax.Cntrl.PwrInHP_vec)
-                Kp_array = permute(WfLimMax.Cntrl.N3.Kp(i,j,k,l,:,:),[5,6,1,2,3,4]);
-                Ki_array = permute(WfLimMax.Cntrl.N3.Ki(i,j,k,l,:,:),[5,6,1,2,3,4]);
-                MWS.Cntrl.WfCntrl.N3Max.Kp_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Kp_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
-                MWS.Cntrl.WfCntrl.N3Max.Ki_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Ki_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
-            end
-        end
-    end
-end
+clear Kp_LL Kp_LH Kp_HL Kp_HH Ki_LL Ki_LH Ki_HL Ki_HH Kp1 Kp2 Ki1 Ki2
+% Propotional
+Kp_LL = WfLimMax.Cntrl.N3.Kp(:,:,:,:,idxJhpsLow,idxJlpsLow);
+Kp_LH = WfLimMax.Cntrl.N3.Kp(:,:,:,:,idxJhpsLow,idxJlpsHi);
+Kp_HL = WfLimMax.Cntrl.N3.Kp(:,:,:,:,idxJhpsHi,idxJlpsLow);
+Kp_HH = WfLimMax.Cntrl.N3.Kp(:,:,:,:,idxJhpsHi,idxJlpsHi);
+Kp1 = Kp_LL*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Kp_HL*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+Kp2 = Kp_LH*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Kp_HH*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+MWS.Cntrl.WfCntrl.N3Max.Kp_array = Kp1*(JlpsH-MWS.Shaft.JlpsEff)/(JlpsH-JlpsL) + Kp2*(MWS.Shaft.JlpsEff-JlpsL)/(JlpsH-JlpsL);
+% Integral
+Ki_LL = WfLimMax.Cntrl.N3.Ki(:,:,:,:,idxJhpsLow,idxJlpsLow);
+Ki_LH = WfLimMax.Cntrl.N3.Ki(:,:,:,:,idxJhpsLow,idxJlpsHi);
+Ki_HL = WfLimMax.Cntrl.N3.Ki(:,:,:,:,idxJhpsHi,idxJlpsLow);
+Ki_HH = WfLimMax.Cntrl.N3.Ki(:,:,:,:,idxJhpsHi,idxJlpsHi);
+Ki1 = Ki_LL*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Ki_HL*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+Ki2 = Ki_LH*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Ki_HH*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+MWS.Cntrl.WfCntrl.N3Max.Ki_array = Ki1*(JlpsH-MWS.Shaft.JlpsEff)/(JlpsH-JlpsL) + Ki2*(MWS.Shaft.JlpsEff-JlpsL)/(JlpsH-JlpsL); 
+% MWS.Cntrl.WfCntrl.N3Max.Kp_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
+% MWS.Cntrl.WfCntrl.N3Max.Ki_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
+% for i = 1:length(WfLimMax.Cntrl.Alt_vec)
+%     for j = 1:length(WfLimMax.Cntrl.MN_vec)
+%         for k = 1:length(WfLimMax.Cntrl.PwrInLP_vec)
+%             for l = 1:length(WfLimMax.Cntrl.PwrInHP_vec)
+%                 Kp_array = permute(WfLimMax.Cntrl.N3.Kp(i,j,k,l,:,:),[5,6,1,2,3,4]);
+%                 Ki_array = permute(WfLimMax.Cntrl.N3.Ki(i,j,k,l,:,:),[5,6,1,2,3,4]);
+%                 MWS.Cntrl.WfCntrl.N3Max.Kp_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Kp_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
+%                 MWS.Cntrl.WfCntrl.N3Max.Ki_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Ki_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
+%             end
+%         end
+%     end
+% end
 MWS.Cntrl.WfCntrl.N3Max.Kiwp = 4754/1296;
 % T3 Max Limiter
 % -- Set-Point
 MWS.Cntrl.WfCntrl.T3Max.SP = 1651.3;
 % -- PI Control Gains
-MWS.Cntrl.WfCntrl.T3Max.Kp_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
-MWS.Cntrl.WfCntrl.T3Max.Ki_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
-for i = 1:length(WfLimMax.Cntrl.Alt_vec)
-    for j = 1:length(WfLimMax.Cntrl.MN_vec)
-        for k = 1:length(WfLimMax.Cntrl.PwrInLP_vec)
-            for l = 1:length(WfLimMax.Cntrl.PwrInHP_vec)
-                Kp_array = permute(WfLimMax.Cntrl.T3.Kp(i,j,k,l,:,:),[5,6,1,2,3,4]);
-                Ki_array = permute(WfLimMax.Cntrl.T3.Ki(i,j,k,l,:,:),[5,6,1,2,3,4]);
-                MWS.Cntrl.WfCntrl.T3Max.Kp_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Kp_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
-                MWS.Cntrl.WfCntrl.T3Max.Ki_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Ki_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
-            end
-        end
-    end
-end
+clear Kp_LL Kp_LH Kp_HL Kp_HH Ki_LL Ki_LH Ki_HL Ki_HH Kp1 Kp2 Ki1 Ki2
+% Propotional
+Kp_LL = WfLimMax.Cntrl.T3.Kp(:,:,:,:,idxJhpsLow,idxJlpsLow);
+Kp_LH = WfLimMax.Cntrl.T3.Kp(:,:,:,:,idxJhpsLow,idxJlpsHi);
+Kp_HL = WfLimMax.Cntrl.T3.Kp(:,:,:,:,idxJhpsHi,idxJlpsLow);
+Kp_HH = WfLimMax.Cntrl.T3.Kp(:,:,:,:,idxJhpsHi,idxJlpsHi);
+Kp1 = Kp_LL*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Kp_HL*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+Kp2 = Kp_LH*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Kp_HH*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+MWS.Cntrl.WfCntrl.T3Max.Kp_array = Kp1*(JlpsH-MWS.Shaft.JlpsEff)/(JlpsH-JlpsL) + Kp2*(MWS.Shaft.JlpsEff-JlpsL)/(JlpsH-JlpsL);
+% Integral
+Ki_LL = WfLimMax.Cntrl.T3.Ki(:,:,:,:,idxJhpsLow,idxJlpsLow);
+Ki_LH = WfLimMax.Cntrl.T3.Ki(:,:,:,:,idxJhpsLow,idxJlpsHi);
+Ki_HL = WfLimMax.Cntrl.T3.Ki(:,:,:,:,idxJhpsHi,idxJlpsLow);
+Ki_HH = WfLimMax.Cntrl.T3.Ki(:,:,:,:,idxJhpsHi,idxJlpsHi);
+Ki1 = Ki_LL*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Ki_HL*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+Ki2 = Ki_LH*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Ki_HH*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+MWS.Cntrl.WfCntrl.T3Max.Ki_array = Ki1*(JlpsH-MWS.Shaft.JlpsEff)/(JlpsH-JlpsL) + Ki2*(MWS.Shaft.JlpsEff-JlpsL)/(JlpsH-JlpsL); 
+% MWS.Cntrl.WfCntrl.T3Max.Kp_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
+% MWS.Cntrl.WfCntrl.T3Max.Ki_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
+% for i = 1:length(WfLimMax.Cntrl.Alt_vec)
+%     for j = 1:length(WfLimMax.Cntrl.MN_vec)
+%         for k = 1:length(WfLimMax.Cntrl.PwrInLP_vec)
+%             for l = 1:length(WfLimMax.Cntrl.PwrInHP_vec)
+%                 Kp_array = permute(WfLimMax.Cntrl.T3.Kp(i,j,k,l,:,:),[5,6,1,2,3,4]);
+%                 Ki_array = permute(WfLimMax.Cntrl.T3.Ki(i,j,k,l,:,:),[5,6,1,2,3,4]);
+%                 MWS.Cntrl.WfCntrl.T3Max.Kp_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Kp_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
+%                 MWS.Cntrl.WfCntrl.T3Max.Ki_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Ki_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
+%             end
+%         end
+%     end
+% end
 MWS.Cntrl.WfCntrl.T3Max.Kiwp = 581.9/1296;
 % T4 Max Limiter
 % -- Set-Point
 MWS.Cntrl.WfCntrl.T4Max.SP = 3169.1;
 % -- PI Control Gains
-MWS.Cntrl.WfCntrl.T4Max.Kp_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
-MWS.Cntrl.WfCntrl.T4Max.Ki_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
-for i = 1:length(WfLimMax.Cntrl.Alt_vec)
-    for j = 1:length(WfLimMax.Cntrl.MN_vec)
-        for k = 1:length(WfLimMax.Cntrl.PwrInLP_vec)
-            for l = 1:length(WfLimMax.Cntrl.PwrInHP_vec)
-                Kp_array = permute(WfLimMax.Cntrl.T4.Kp(i,j,k,l,:,:),[5,6,1,2,3,4]);
-                Ki_array = permute(WfLimMax.Cntrl.T4.Ki(i,j,k,l,:,:),[5,6,1,2,3,4]);
-                MWS.Cntrl.WfCntrl.T4Max.Kp_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Kp_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
-                MWS.Cntrl.WfCntrl.T4Max.Ki_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Ki_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
-            end
-        end
-    end
-end
+clear Kp_LL Kp_LH Kp_HL Kp_HH Ki_LL Ki_LH Ki_HL Ki_HH Kp1 Kp2 Ki1 Ki2
+% Propotional
+Kp_LL = WfLimMax.Cntrl.T4.Kp(:,:,:,:,idxJhpsLow,idxJlpsLow);
+Kp_LH = WfLimMax.Cntrl.T4.Kp(:,:,:,:,idxJhpsLow,idxJlpsHi);
+Kp_HL = WfLimMax.Cntrl.T4.Kp(:,:,:,:,idxJhpsHi,idxJlpsLow);
+Kp_HH = WfLimMax.Cntrl.T4.Kp(:,:,:,:,idxJhpsHi,idxJlpsHi);
+Kp1 = Kp_LL*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Kp_HL*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+Kp2 = Kp_LH*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Kp_HH*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+MWS.Cntrl.WfCntrl.T4Max.Kp_array = Kp1*(JlpsH-MWS.Shaft.JlpsEff)/(JlpsH-JlpsL) + Kp2*(MWS.Shaft.JlpsEff-JlpsL)/(JlpsH-JlpsL);
+% Integral
+Ki_LL = WfLimMax.Cntrl.T4.Ki(:,:,:,:,idxJhpsLow,idxJlpsLow);
+Ki_LH = WfLimMax.Cntrl.T4.Ki(:,:,:,:,idxJhpsLow,idxJlpsHi);
+Ki_HL = WfLimMax.Cntrl.T4.Ki(:,:,:,:,idxJhpsHi,idxJlpsLow);
+Ki_HH = WfLimMax.Cntrl.T4.Ki(:,:,:,:,idxJhpsHi,idxJlpsHi);
+Ki1 = Ki_LL*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Ki_HL*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+Ki2 = Ki_LH*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Ki_HH*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+MWS.Cntrl.WfCntrl.T4Max.Ki_array = Ki1*(JlpsH-MWS.Shaft.JlpsEff)/(JlpsH-JlpsL) + Ki2*(MWS.Shaft.JlpsEff-JlpsL)/(JlpsH-JlpsL); 
+% MWS.Cntrl.WfCntrl.T4Max.Kp_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
+% MWS.Cntrl.WfCntrl.T4Max.Ki_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
+% for i = 1:length(WfLimMax.Cntrl.Alt_vec)
+%     for j = 1:length(WfLimMax.Cntrl.MN_vec)
+%         for k = 1:length(WfLimMax.Cntrl.PwrInLP_vec)
+%             for l = 1:length(WfLimMax.Cntrl.PwrInHP_vec)
+%                 Kp_array = permute(WfLimMax.Cntrl.T4.Kp(i,j,k,l,:,:),[5,6,1,2,3,4]);
+%                 Ki_array = permute(WfLimMax.Cntrl.T4.Ki(i,j,k,l,:,:),[5,6,1,2,3,4]);
+%                 MWS.Cntrl.WfCntrl.T4Max.Kp_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Kp_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
+%                 MWS.Cntrl.WfCntrl.T4Max.Ki_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Ki_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
+%             end
+%         end
+%     end
+% end
 MWS.Cntrl.WfCntrl.T4Max.Kiwp = 1794/1296;
 % T45 Max Limiter
 % -- Set-Point
 MWS.Cntrl.WfCntrl.Sched.T45MaxSP.T45MaxSP_array = permute(dataTrim.T45(end,:,:,:,:),[2 3 4 5 1]); %f(Alt,MN,PwrInLP,PwrInHP)
 % -- PI Control Gains
-MWS.Cntrl.WfCntrl.T45Max.Kp_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
-MWS.Cntrl.WfCntrl.T45Max.Ki_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
-for i = 1:length(WfLimMax.Cntrl.Alt_vec)
-    for j = 1:length(WfLimMax.Cntrl.MN_vec)
-        for k = 1:length(WfLimMax.Cntrl.PwrInLP_vec)
-            for l = 1:length(WfLimMax.Cntrl.PwrInHP_vec)
-                Kp_array = permute(WfLimMax.Cntrl.T45.Kp(i,j,k,l,:,:),[5,6,1,2,3,4]);
-                Ki_array = permute(WfLimMax.Cntrl.T45.Ki(i,j,k,l,:,:),[5,6,1,2,3,4]);
-                MWS.Cntrl.WfCntrl.T45Max.Kp_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Kp_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
-                MWS.Cntrl.WfCntrl.T45Max.Ki_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Ki_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
-            end
-        end
-    end
-end
+clear Kp_LL Kp_LH Kp_HL Kp_HH Ki_LL Ki_LH Ki_HL Ki_HH Kp1 Kp2 Ki1 Ki2
+% Propotional
+Kp_LL = WfLimMax.Cntrl.T45.Kp(:,:,:,:,idxJhpsLow,idxJlpsLow);
+Kp_LH = WfLimMax.Cntrl.T45.Kp(:,:,:,:,idxJhpsLow,idxJlpsHi);
+Kp_HL = WfLimMax.Cntrl.T45.Kp(:,:,:,:,idxJhpsHi,idxJlpsLow);
+Kp_HH = WfLimMax.Cntrl.T45.Kp(:,:,:,:,idxJhpsHi,idxJlpsHi);
+Kp1 = Kp_LL*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Kp_HL*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+Kp2 = Kp_LH*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Kp_HH*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+MWS.Cntrl.WfCntrl.T45Max.Kp_array = Kp1*(JlpsH-MWS.Shaft.JlpsEff)/(JlpsH-JlpsL) + Kp2*(MWS.Shaft.JlpsEff-JlpsL)/(JlpsH-JlpsL);
+% Integral
+Ki_LL = WfLimMax.Cntrl.T45.Ki(:,:,:,:,idxJhpsLow,idxJlpsLow);
+Ki_LH = WfLimMax.Cntrl.T45.Ki(:,:,:,:,idxJhpsLow,idxJlpsHi);
+Ki_HL = WfLimMax.Cntrl.T45.Ki(:,:,:,:,idxJhpsHi,idxJlpsLow);
+Ki_HH = WfLimMax.Cntrl.T45.Ki(:,:,:,:,idxJhpsHi,idxJlpsHi);
+Ki1 = Ki_LL*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Ki_HL*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+Ki2 = Ki_LH*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Ki_HH*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+MWS.Cntrl.WfCntrl.T45Max.Ki_array = Ki1*(JlpsH-MWS.Shaft.JlpsEff)/(JlpsH-JlpsL) + Ki2*(MWS.Shaft.JlpsEff-JlpsL)/(JlpsH-JlpsL); 
+% MWS.Cntrl.WfCntrl.T45Max.Kp_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
+% MWS.Cntrl.WfCntrl.T45Max.Ki_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
+% for i = 1:length(WfLimMax.Cntrl.Alt_vec)
+%     for j = 1:length(WfLimMax.Cntrl.MN_vec)
+%         for k = 1:length(WfLimMax.Cntrl.PwrInLP_vec)
+%             for l = 1:length(WfLimMax.Cntrl.PwrInHP_vec)
+%                 Kp_array = permute(WfLimMax.Cntrl.T45.Kp(i,j,k,l,:,:),[5,6,1,2,3,4]);
+%                 Ki_array = permute(WfLimMax.Cntrl.T45.Ki(i,j,k,l,:,:),[5,6,1,2,3,4]);
+%                 MWS.Cntrl.WfCntrl.T45Max.Kp_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Kp_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
+%                 MWS.Cntrl.WfCntrl.T45Max.Ki_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Ki_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
+%             end
+%         end
+%     end
+% end
 MWS.Cntrl.WfCntrl.T45Max.Kiwp = 1296/1296;
 % Ps3 Max Limiter
 % -- Set-Point
 MWS.Cntrl.WfCntrl.Ps3Max.SP = 581.22;
 % -- PI Control Gains
-MWS.Cntrl.WfCntrl.Ps3Max.Kp_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
-MWS.Cntrl.WfCntrl.Ps3Max.Ki_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
-for i = 1:length(WfLimMax.Cntrl.Alt_vec)
-    for j = 1:length(WfLimMax.Cntrl.MN_vec)
-        for k = 1:length(WfLimMax.Cntrl.PwrInLP_vec)
-            for l = 1:length(WfLimMax.Cntrl.PwrInHP_vec)
-                Kp_array = permute(WfLimMax.Cntrl.Ps3.Kp(i,j,k,l,:,:),[5,6,1,2,3,4]);
-                Ki_array = permute(WfLimMax.Cntrl.Ps3.Ki(i,j,k,l,:,:),[5,6,1,2,3,4]);
-                MWS.Cntrl.WfCntrl.Ps3Max.Kp_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Kp_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
-                MWS.Cntrl.WfCntrl.Ps3Max.Ki_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Ki_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
-            end
-        end
-    end
-end
+clear Kp_LL Kp_LH Kp_HL Kp_HH Ki_LL Ki_LH Ki_HL Ki_HH Kp1 Kp2 Ki1 Ki2
+% Propotional
+Kp_LL = WfLimMax.Cntrl.Ps3.Kp(:,:,:,:,idxJhpsLow,idxJlpsLow);
+Kp_LH = WfLimMax.Cntrl.Ps3.Kp(:,:,:,:,idxJhpsLow,idxJlpsHi);
+Kp_HL = WfLimMax.Cntrl.Ps3.Kp(:,:,:,:,idxJhpsHi,idxJlpsLow);
+Kp_HH = WfLimMax.Cntrl.Ps3.Kp(:,:,:,:,idxJhpsHi,idxJlpsHi);
+Kp1 = Kp_LL*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Kp_HL*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+Kp2 = Kp_LH*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Kp_HH*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+MWS.Cntrl.WfCntrl.Ps3Max.Kp_array = Kp1*(JlpsH-MWS.Shaft.JlpsEff)/(JlpsH-JlpsL) + Kp2*(MWS.Shaft.JlpsEff-JlpsL)/(JlpsH-JlpsL);
+% Integral
+Ki_LL = WfLimMax.Cntrl.Ps3.Ki(:,:,:,:,idxJhpsLow,idxJlpsLow);
+Ki_LH = WfLimMax.Cntrl.Ps3.Ki(:,:,:,:,idxJhpsLow,idxJlpsHi);
+Ki_HL = WfLimMax.Cntrl.Ps3.Ki(:,:,:,:,idxJhpsHi,idxJlpsLow);
+Ki_HH = WfLimMax.Cntrl.Ps3.Ki(:,:,:,:,idxJhpsHi,idxJlpsHi);
+Ki1 = Ki_LL*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Ki_HL*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+Ki2 = Ki_LH*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Ki_HH*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+MWS.Cntrl.WfCntrl.Ps3Max.Ki_array = Ki1*(JlpsH-MWS.Shaft.JlpsEff)/(JlpsH-JlpsL) + Ki2*(MWS.Shaft.JlpsEff-JlpsL)/(JlpsH-JlpsL); 
+% MWS.Cntrl.WfCntrl.Ps3Max.Kp_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
+% MWS.Cntrl.WfCntrl.Ps3Max.Ki_array = zeros(length(WfLimMax.Cntrl.Alt_vec),length(WfLimMax.Cntrl.MN_vec),length(WfLimMax.Cntrl.PwrInLP_vec),length(WfLimMax.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInLP,PwrInHP)
+% for i = 1:length(WfLimMax.Cntrl.Alt_vec)
+%     for j = 1:length(WfLimMax.Cntrl.MN_vec)
+%         for k = 1:length(WfLimMax.Cntrl.PwrInLP_vec)
+%             for l = 1:length(WfLimMax.Cntrl.PwrInHP_vec)
+%                 Kp_array = permute(WfLimMax.Cntrl.Ps3.Kp(i,j,k,l,:,:),[5,6,1,2,3,4]);
+%                 Ki_array = permute(WfLimMax.Cntrl.Ps3.Ki(i,j,k,l,:,:),[5,6,1,2,3,4]);
+%                 MWS.Cntrl.WfCntrl.Ps3Max.Kp_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Kp_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
+%                 MWS.Cntrl.WfCntrl.Ps3Max.Ki_array(i,j,k,l) = interp2(WfLimMax.Cntrl.Jhps_vec,WfLimMax.Cntrl.Jlps_vec,Ki_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
+%             end
+%         end
+%     end
+% end
 MWS.Cntrl.WfCntrl.Ps3Max.Kiwp = 372/1296;
 % Ps3 Min Limiter
 % -- Set-Point
@@ -420,18 +569,35 @@ end
 % -- PI Control Gains for Ps3Min
 MWS.Cntrl.WfCntrl.Ps3Min.PwrInHP_vec = WfLimMin.Cntrl.PwrInHP_vec;
 % ---- [Kp,Ki] = f(Alt,MN)
-MWS.Cntrl.WfCntrl.Ps3Min.Kp_array = zeros(length(WfLimMin.Cntrl.Alt_vec),length(WfLimMin.Cntrl.MN_vec),length(WfLimMin.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInHP)
-MWS.Cntrl.WfCntrl.Ps3Min.Ki_array = zeros(length(WfLimMin.Cntrl.Alt_vec),length(WfLimMin.Cntrl.MN_vec),length(WfLimMin.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInHP)
-for i = 1:length(WfLimMin.Cntrl.Alt_vec)
-    for j = 1:length(WfLimMin.Cntrl.MN_vec)
-        for l = 1:length(WfLimMin.Cntrl.PwrInHP_vec)
-            Kp_array = permute(WfLimMin.Cntrl.Ps3.Kp(i,j,l,:,:),[4,5,1,2,3]);
-            Ki_array = permute(WfLimMin.Cntrl.Ps3.Ki(i,j,l,:,:),[4,5,1,2,3]);
-            MWS.Cntrl.WfCntrl.Ps3Min.Kp_array(i,j,l) = interp2(WfLimMin.Cntrl.Jhps_vec,WfLimMin.Cntrl.Jlps_vec,Kp_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
-            MWS.Cntrl.WfCntrl.Ps3Min.Ki_array(i,j,l) = interp2(WfLimMin.Cntrl.Jhps_vec,WfLimMin.Cntrl.Jlps_vec,Ki_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
-        end
-    end
-end
+clear Kp_LL Kp_LH Kp_HL Kp_HH Ki_LL Ki_LH Ki_HL Ki_HH Kp1 Kp2 Ki1 Ki2
+% Propotional
+Kp_LL = WfLimMin.Cntrl.Ps3.Kp(:,:,:,idxJhpsLow,idxJlpsLow);
+Kp_LH = WfLimMin.Cntrl.Ps3.Kp(:,:,:,idxJhpsLow,idxJlpsHi);
+Kp_HL = WfLimMin.Cntrl.Ps3.Kp(:,:,:,idxJhpsHi,idxJlpsLow);
+Kp_HH = WfLimMin.Cntrl.Ps3.Kp(:,:,:,idxJhpsHi,idxJlpsHi);
+Kp1 = Kp_LL*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Kp_HL*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+Kp2 = Kp_LH*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Kp_HH*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+MWS.Cntrl.WfCntrl.Ps3Min.Kp_array = Kp1*(JlpsH-MWS.Shaft.JlpsEff)/(JlpsH-JlpsL) + Kp2*(MWS.Shaft.JlpsEff-JlpsL)/(JlpsH-JlpsL);
+% Integral
+Ki_LL = WfLimMin.Cntrl.Ps3.Ki(:,:,:,idxJhpsLow,idxJlpsLow);
+Ki_LH = WfLimMin.Cntrl.Ps3.Ki(:,:,:,idxJhpsLow,idxJlpsHi);
+Ki_HL = WfLimMin.Cntrl.Ps3.Ki(:,:,:,idxJhpsHi,idxJlpsLow);
+Ki_HH = WfLimMin.Cntrl.Ps3.Ki(:,:,:,idxJhpsHi,idxJlpsHi);
+Ki1 = Ki_LL*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Ki_HL*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+Ki2 = Ki_LH*(JhpsH-MWS.Shaft.JhpsEff)/(JhpsH-JhpsL) + Ki_HH*(MWS.Shaft.JhpsEff-JhpsL)/(JhpsH-JhpsL);
+MWS.Cntrl.WfCntrl.Ps3Min.Ki_array = Ki1*(JlpsH-MWS.Shaft.JlpsEff)/(JlpsH-JlpsL) + Ki2*(MWS.Shaft.JlpsEff-JlpsL)/(JlpsH-JlpsL); 
+% MWS.Cntrl.WfCntrl.Ps3Min.Kp_array = zeros(length(WfLimMin.Cntrl.Alt_vec),length(WfLimMin.Cntrl.MN_vec),length(WfLimMin.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInHP)
+% MWS.Cntrl.WfCntrl.Ps3Min.Ki_array = zeros(length(WfLimMin.Cntrl.Alt_vec),length(WfLimMin.Cntrl.MN_vec),length(WfLimMin.Cntrl.PwrInHP_vec)); %f(PL,Alt,MN,PwrInHP)
+% for i = 1:length(WfLimMin.Cntrl.Alt_vec)
+%     for j = 1:length(WfLimMin.Cntrl.MN_vec)
+%         for l = 1:length(WfLimMin.Cntrl.PwrInHP_vec)
+%             Kp_array = permute(WfLimMin.Cntrl.Ps3.Kp(i,j,l,:,:),[4,5,1,2,3]);
+%             Ki_array = permute(WfLimMin.Cntrl.Ps3.Ki(i,j,l,:,:),[4,5,1,2,3]);
+%             MWS.Cntrl.WfCntrl.Ps3Min.Kp_array(i,j,l) = interp2(WfLimMin.Cntrl.Jhps_vec,WfLimMin.Cntrl.Jlps_vec,Kp_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
+%             MWS.Cntrl.WfCntrl.Ps3Min.Ki_array(i,j,l) = interp2(WfLimMin.Cntrl.Jhps_vec,WfLimMin.Cntrl.Jlps_vec,Ki_array,MWS.Shaft.JhpsEff,MWS.Shaft.JlpsEff,'linear');
+%         end
+%     end
+% end
 MWS.Cntrl.WfCntrl.Ps3Min.Kiwp = 372/1296;
 
 % Fuel Flow limit Controllers --------------------------------------------%
@@ -520,21 +686,37 @@ MWS.Cntrl.WfCntrl.Decel.PEx.RUsch.RU_array(:,:,:,2) = decelMod*RUSch_PEx_d_EPT.S
 
 % Max Limits
 % -- Sun Gear EM
-MWS.Cntrl.EMS.PwrMax_Base = MWS.PowerSystem.EMS.PMaxC;
-MWS.Cntrl.EMS.TrqMax_Base = MWS.PowerSystem.EMS.TrqMaxC;
+MWS.Cntrl.EMS.PwrMax_Base = MWS.PowerSystem.EMS.PMaxC*1.1;
+MWS.Cntrl.EMS.TrqMax_Base = MWS.PowerSystem.EMS.TrqMaxC*1.1;
 % -- Ring Gear EM
-MWS.Cntrl.EMR.PwrMax_Base = MWS.PowerSystem.EMR.PMaxC;
-MWS.Cntrl.EMR.TrqMax_Base = MWS.PowerSystem.EMR.TrqMaxC;
+MWS.Cntrl.EMR.PwrMax_Base = MWS.PowerSystem.EMR.PMaxC*1.1;
+MWS.Cntrl.EMR.TrqMax_Base = MWS.PowerSystem.EMR.TrqMaxC*1.1;
 % -- Carrier EM
-MWS.Cntrl.EMC.PwrMax_Base = MWS.PowerSystem.EMC.PMaxC;
-MWS.Cntrl.EMC.TrqMax_Base = MWS.PowerSystem.EMC.TrqMaxC;
+MWS.Cntrl.EMC.PwrMax_Base = MWS.PowerSystem.EMC.PMaxC*1.1;
+MWS.Cntrl.EMC.TrqMax_Base = MWS.PowerSystem.EMC.TrqMaxC*1.1;
 
 % Turbine Electrified Energy Management Controller -----------------------%
 
 % TEEM Accel and Decel Schedules, f(N1cErrN,Alt)
 % NOTE: Alt vector is MWS.Cntrl.SPSched.Alt_vec
 MWS.Cntrl.TEEM.N1cErrN_vec = [-1 -0.25 -0.10 -0.075 0 0.075 0.10 0.25 1];
+if MWS.In.Options.HybridConfig == 1 && MWS.In.Options.EngineEMInt == 2
+    MWS.Cntrl.TEEM.N1cErrN_vec(8) = 0.7;
+elseif MWS.In.Options.HybridConfig == 2 && MWS.In.Options.EngineEMInt == 2
+    MWS.Cntrl.TEEM.N1cErrN_vec(8) = 0.7;
+elseif MWS.In.Options.HybridConfig == 3 && MWS.In.Options.EngineEMInt == 2
+    MWS.Cntrl.TEEM.N1cErrN_vec(8) = 0.7;
+end
 MWS.Cntrl.TEEM.PwrInAccel.Pwr_array = 500*[0 0 0 0 0 0   0    0   0   0;
+                                           0 0 0 0 0 0   0    0   0   0;
+                                           0 0 0 0 0 0   0    0   0   0;
+                                           0 0 0 0 0 0   0    0   0   0;
+                                           0 0 0 0 0 0   0    0   0   0;
+                                           0 0 0 0 0 0   0    0   0   0;
+                                           0.05 0.05 0.05 0.05 0.05 0.05 0.04 0.035 0.03 0.03;
+                                           1 1 1 1 1 1 0.8 0.75 0.7 0.7;
+                                           1 1 1 1 1 1 0.8 0.75 0.7 0.7];
+MWS.Cntrl.TEEM.PwrExAccel.Pwr_array = 200*[0 0 0 0 0 0   0    0   0   0;
                                            0 0 0 0 0 0   0    0   0   0;
                                            0 0 0 0 0 0   0    0   0   0;
                                            0 0 0 0 0 0   0    0   0   0;
@@ -553,83 +735,51 @@ MWS.Cntrl.TEEM.PwrXDecel.Pwr_array = 200*[1 1 1 1 1 1 0.8 0.75 0.7 0.7;
                                           0 0 0 0 0 0   0    0   0   0;
                                           0 0 0 0 0 0   0    0   0   0]; 
 
-% Max Limits
-PwrMax_HP = 500;
-PwrMax_Coup = 200;
-if MWS.In.Options.PGBConfig == 1
-    % -- Sun Gear EM
-    MWS.Cntrl.EMS.PwrMax_TEEM = PwrMax_HP;
-    MWS.Cntrl.EMS.TrqMax_TEEM = inf;
-    % -- Ring Gear EM
-    MWS.Cntrl.EMR.PwrMax_TEEM = 0;
-    MWS.Cntrl.EMR.TrqMax_TEEM = inf;
-    % -- Carrier EM
-    MWS.Cntrl.EMC.PwrMax_TEEM = PwrMax_Coup;
-    MWS.Cntrl.EMC.TrqMax_TEEM = inf;
-elseif MWS.In.Options.PGBConfig == 2
-    % -- Sun Gear EM
-    MWS.Cntrl.EMS.PwrMax_TEEM = PwrMax_HP;
-    MWS.Cntrl.EMS.TrqMax_TEEM = inf;
-    % -- Ring Gear EM
-    MWS.Cntrl.EMR.PwrMax_TEEM = PwrMax_Coup;
-    MWS.Cntrl.EMR.TrqMax_TEEM = inf;
-    % -- Carrier EM
-    MWS.Cntrl.EMC.PwrMax_TEEM = 0;
-    MWS.Cntrl.EMC.TrqMax_TEEM = inf;
-elseif MWS.In.Options.PGBConfig == 3
-    % -- Sun Gear EM
-    MWS.Cntrl.EMS.PwrMax_TEEM = 0;
-    MWS.Cntrl.EMS.TrqMax_TEEM = inf;
-    % -- Ring Gear EM
-    MWS.Cntrl.EMR.PwrMax_TEEM = PwrMax_HP;
-    MWS.Cntrl.EMR.TrqMax_TEEM = inf;
-    % -- Carrier EM
-    MWS.Cntrl.EMC.PwrMax_TEEM = PwrMax_Coup;
-    MWS.Cntrl.EMC.TrqMax_TEEM = inf;
-elseif MWS.In.Options.PGBConfig == 4
-    % -- Sun Gear EM
-    MWS.Cntrl.EMS.PwrMax_TEEM = PwrMax_Coup;
-    MWS.Cntrl.EMS.TrqMax_TEEM = inf;
-    % -- Ring Gear EM
-    MWS.Cntrl.EMR.PwrMax_TEEM = PwrMax_HP;
-    MWS.Cntrl.EMR.TrqMax_TEEM = inf;
-    % -- Carrier EM
-    MWS.Cntrl.EMC.PwrMax_TEEM = 0;
-    MWS.Cntrl.EMC.TrqMax_TEEM = inf;
-elseif MWS.In.Options.PGBConfig == 5
-    % -- Sun Gear EM
-    MWS.Cntrl.EMS.PwrMax_TEEM = 0;
-    MWS.Cntrl.EMS.TrqMax_TEEM = inf;
-    % -- Ring Gear EM
-    MWS.Cntrl.EMR.PwrMax_TEEM = PwrMax_Coup;
-    MWS.Cntrl.EMR.TrqMax_TEEM = inf;
-    % -- Carrier EM
-    MWS.Cntrl.EMC.PwrMax_TEEM = PwrMax_HP;
-    MWS.Cntrl.EMC.TrqMax_TEEM = inf;
-else
-    % -- Sun Gear EM
-    MWS.Cntrl.EMS.PwrMax_TEEM = PwrMax_Coup;
-    MWS.Cntrl.EMS.TrqMax_TEEM = inf;
-    % -- Ring Gear EM
-    MWS.Cntrl.EMR.PwrMax_TEEM = 0;
-    MWS.Cntrl.EMR.TrqMax_TEEM = inf;
-    % -- Carrier EM
-    MWS.Cntrl.EMC.PwrMax_TEEM = PwrMax_HP;
-    MWS.Cntrl.EMC.TrqMax_TEEM = inf;
-end
-
 % State of Charge Controller ---------------------------------------------%
 
-% Open-Loop Charging Schedule
-MWS.Cntrl.SOCReg.PwrCharge.SOC_vec = [0 80 85 87.5 92.5 100];
-MWS.Cntrl.SOCReg.PwrCharge.Pwr_vec = 50*[1 1 0 0 -1 -1];
+% State of Charge Target
+if MWS.In.Options.HybridConfig == 2 %battery
+    MWS.Cntrl.SOCReg.PwrCharge.SOC_targ = 85;
+else %super-cap
+    MWS.Cntrl.SOCReg.PwrCharge.SOC_targ = 95;
+end
+
+% Maximum charging power
+MWS.Cntrl.SOCReg.PwrCharge.N1cN_vec = [0 0.15 0.2 1];
+if MWS.In.Options.HybridConfig == 2
+    MWS.Cntrl.SOCReg.PwrCharge.Pmax_vec = [200 200 200 200]; %[50 50 100 100]; %75;
+else
+    MWS.Cntrl.SOCReg.PwrCharge.Pmax_vec = [100 100 120 120]; %[50 50 100 100]; %75;
+end
+
+% Closed-loop control
+MWS.Cntrl.SOCReg.PwrCharge.Ki = 1; 
+if MWS.In.Options.HybridConfig == 2
+    MWS.Cntrl.SOCReg.PwrCharge.Kp = 100;
+elseif MWS.In.Options.HybridConfig == 1
+    MWS.Cntrl.SOCReg.PwrCharge.Kp = 8; %12; %10 
+else
+    MWS.Cntrl.SOCReg.PwrCharge.Kp = 12;
+end
+MWS.Cntrl.SOCReg.PwrCharge.Kiwp = 1;
+MWS.Cntrl.SOCReg.PwrCharge.IntSat = 150; %75; 
+%MWS.Cntrl.SOCReg.PwrCharge.Pmax = 100; 
+
+% % Open-Loop Charging Schedule
+% MWS.Cntrl.SOCReg.PwrCharge.Sched.PwrCharge_vec = [-MWS.Cntrl.SOCReg.PwrCharge.Pmax -MWS.Cntrl.SOCReg.PwrCharge.Pmax 0 MWS.Cntrl.SOCReg.PwrCharge.Pmax MWS.Cntrl.SOCReg.PwrCharge.Pmax];
+% if MWS.In.Options.HybridConfig == 2
+%     MWS.Cntrl.SOCReg.PwrCharge.Sched.SOCErr_vec = [-100 -2 0 2 100];
+% else
+%     MWS.Cntrl.SOCReg.PwrCharge.Sched.SOCErr_vec = [-100 -10 0 10 100];
+% end
+% MWS.Cntrl.SOCReg.PwrCharge.Sched.Xr = MWS.Cntrl.SOCReg.PwrCharge.Sched.SOCErr_vec(2);
 
 % Activation Parameter
-MWS.Cntrl.SOCReg.Activation.N1cErrN_vec = [0 0.05 0.1 1];
+MWS.Cntrl.SOCReg.Activation.N1cErrN_vec = [0 0.05 0.25 1];
 MWS.Cntrl.SOCReg.Activation.Param_vec = [1 1 0 0];
 
 % Transition Rate Limit
-MWS.Cntrl.SOCReg.PwrRateLim = max(abs(MWS.Cntrl.SOCReg.PwrCharge.Pwr_vec))/1; %can change command by max charge power amount in 1 second
+MWS.Cntrl.SOCReg.PwrRateLim = 100; %40; %max(abs(MWS.Cntrl.SOCReg.PwrCharge.Pwr_vec))/1; %can change command by max charge power amount in 1 second
 
 % Contoller Calculations -------------------------------------------------%
 

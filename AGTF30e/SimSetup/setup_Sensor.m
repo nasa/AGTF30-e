@@ -77,22 +77,22 @@ MWS.Sensor.NemH.Min = 500;
 % NemS sensor inputs - sun gear electric machine speed (VEATE option)
 MWS.Sensor.NemS.Tau = 1/50;
 MWS.Sensor.NemS.Max = 100000;
-MWS.Sensor.NemS.Min = 100;
+MWS.Sensor.NemS.Min = -100000;
 
 % NemR sensor inputs - ring gear electric machine speed (VEATE option)
 MWS.Sensor.NemR.Tau = 1/50;
 MWS.Sensor.NemR.Max = 100000;
-MWS.Sensor.NemR.Min = 100;
+MWS.Sensor.NemR.Min = -100000;
 
 % NemC sensor inputs - Carrier electric machine speed (VEATE option)
 MWS.Sensor.NemC.Tau = 1/50;
 MWS.Sensor.NemC.Max = 100000;
-MWS.Sensor.NemC.Min = 100;
+MWS.Sensor.NemC.Min = -100000;
 
 % NemP sensor inputs - Planet gear electric machine speed (VEATE option)
 MWS.Sensor.NemP.Tau = 1/50;
 MWS.Sensor.NemP.Max = 100000;
-MWS.Sensor.NemP.Min = 100;
+MWS.Sensor.NemP.Min = -100000;
 
 % SOC sensor inputs
 MWS.Sensor.SOC.Tau = 1/50;

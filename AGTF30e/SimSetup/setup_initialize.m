@@ -407,7 +407,7 @@ else
         MWS.Init.IC.NemP = (MWS.Init.IC.NemR*MWS.Shaft.PGB.Ring.GR_gb - MWS.Init.IC.NemC*MWS.Shaft.PGB.Carrier.GR_gb)*(rR/rP)/MWS.Shaft.PGB.Planet.GR_gb;
         MWS.Init.IC.NemS = (MWS.Init.IC.NemC*MWS.Shaft.PGB.Carrier.GR_gb*rS - MWS.Init.IC.NemP*MWS.Shaft.PGB.Planet.GR_gb*rP)/rS/MWS.Shaft.PGB.Sun.GR_gb;
     end
-    MWS.Init.IC.SOC = 85;
+    %MWS.Init.IC.SOC; <-- initialized in Setup_EMTAT_EPS.m
 
     % Controller
     % NOTE: Planetary gearbox power initialization assumes the gearbox
@@ -440,42 +440,72 @@ else
         if MWS.In.Options.PGBConfig == 1 %HP-Sun, LP-Ring
             PwrFactorL = (NC/NR)/MWS.Shaft.PGB.TrqCoeff.CTrqRC;
             PwrFactorH = (NC/NS)/MWS.Shaft.PGB.TrqCoeff.CTrqSC;
-            MWS.Init.IC.PwrEMC = sign(PwrInLP*PwrFactorL)*min(abs([PwrInLP*PwrFactorL, MWS.Cntrl.EMC.PwrMax_Base, MWS.Cntrl.EMC.TrqMax_Base*MWS.Init.IC.NemC/5252.113]));
+            if MWS.In.Options.HybridConfig == 3
+                PwrCoupMax = 0;
+            else
+                PwrCoupMax = MWS.Cntrl.EMC.PwrMax_Base;
+            end
+            MWS.Init.IC.PwrEMC = sign(PwrInLP*PwrFactorL)*min(abs([PwrInLP*PwrFactorL, PwrCoupMax, MWS.Cntrl.EMC.TrqMax_Base*MWS.Init.IC.NemC/5252.113]));
             MWS.Init.IC.PwrEMR = sign(PwrInLP-MWS.Init.IC.PwrEMC/PwrFactorL)*min(abs([PwrInLP-MWS.Init.IC.PwrEMC/PwrFactorL, MWS.Cntrl.EMR.PwrMax_Base, MWS.Cntrl.EMR.TrqMax_Base*MWS.Init.IC.NemR/5252.113]));
             MWS.Init.IC.PwrEMS = sign(PwrInHP-MWS.Init.IC.PwrEMC/PwrFactorH)*min(abs([PwrInHP-MWS.Init.IC.PwrEMC/PwrFactorH, MWS.Cntrl.EMS.PwrMax_Base, MWS.Cntrl.EMS.TrqMax_Base*MWS.Init.IC.NemS/5252.113]));
             MWS.Init.IC.PwrEMP = 0;
         elseif MWS.In.Options.PGBConfig == 2 %HP-Sun, LP-Carrier
             PwrFactorL = (NR/NC)/MWS.Shaft.PGB.TrqCoeff.CTrqCR;
             PwrFactorH = (NR/NS)/MWS.Shaft.PGB.TrqCoeff.CTrqSR;
-            MWS.Init.IC.PwrEMR = sign(PwrInLP*PwrFactorL)*min(abs([PwrInLP*PwrFactorL, MWS.Cntrl.EMR.PwrMax_Base, MWS.Cntrl.EMR.TrqMax_Base*MWS.Init.IC.NemR/5252.113]));
+            if MWS.In.Options.HybridConfig == 3
+                PwrCoupMax = 0;
+            else
+                PwrCoupMax = MWS.Cntrl.EMR.PwrMax_Base;
+            end
+            MWS.Init.IC.PwrEMR = sign(PwrInLP*PwrFactorL)*min(abs([PwrInLP*PwrFactorL, PwrCoupMax, MWS.Cntrl.EMR.TrqMax_Base*MWS.Init.IC.NemR/5252.113]));
             MWS.Init.IC.PwrEMC = sign(PwrInLP-MWS.Init.IC.PwrEMR/PwrFactorL)*min(abs([PwrInLP-MWS.Init.IC.PwrEMR/PwrFactorL, MWS.Cntrl.EMC.PwrMax_Base, MWS.Cntrl.EMC.TrqMax_Base*MWS.Init.IC.NemC/5252.113]));
             MWS.Init.IC.PwrEMS = sign(PwrInHP-MWS.Init.IC.PwrEMR/PwrFactorH)*min(abs([PwrInHP-MWS.Init.IC.PwrEMR/PwrFactorH, MWS.Cntrl.EMS.PwrMax_Base, MWS.Cntrl.EMS.TrqMax_Base*MWS.Init.IC.NemS/5252.113]));
             MWS.Init.IC.PwrEMP = 0;
         elseif MWS.In.Options.PGBConfig == 3 %HP-Ring, LP-Sun
             PwrFactorL = (NC/NS)/MWS.Shaft.PGB.TrqCoeff.CTrqSC;
             PwrFactorH = (NC/NR)/MWS.Shaft.PGB.TrqCoeff.CTrqRC;
-            MWS.Init.IC.PwrEMC = sign(PwrInLP*PwrFactorL)*min(abs([PwrInLP*PwrFactorL, MWS.Cntrl.EMC.PwrMax_Base, MWS.Cntrl.EMC.TrqMax_Base*MWS.Init.IC.NemC/5252.113]));
+            if MWS.In.Options.HybridConfig == 3
+                PwrCoupMax = 0;
+            else
+                PwrCoupMax = MWS.Cntrl.EMC.PwrMax_Base;
+            end
+            MWS.Init.IC.PwrEMC = sign(PwrInLP*PwrFactorL)*min(abs([PwrInLP*PwrFactorL, PwrCoupMax, MWS.Cntrl.EMC.TrqMax_Base*MWS.Init.IC.NemC/5252.113]));
             MWS.Init.IC.PwrEMS = sign(PwrInLP-MWS.Init.IC.PwrEMC/PwrFactorL)*min(abs([PwrInLP-MWS.Init.IC.PwrEMC/PwrFactorL, MWS.Cntrl.EMS.PwrMax_Base, MWS.Cntrl.EMS.TrqMax_Base*MWS.Init.IC.NemS/5252.113]));
             MWS.Init.IC.PwrEMR = sign(PwrInHP-MWS.Init.IC.PwrEMC/PwrFactorH)*min(abs([PwrInHP-MWS.Init.IC.PwrEMC/PwrFactorH, MWS.Cntrl.EMR.PwrMax_Base, MWS.Cntrl.EMR.TrqMax_Base*MWS.Init.IC.NemR/5252.113]));
             MWS.Init.IC.PwrEMP = 0;
         elseif MWS.In.Options.PGBConfig == 4 %HP-Ring, LP-Carrier
             PwrFactorL = (NS/NC)/MWS.Shaft.PGB.TrqCoeff.CTrqCS;
             PwrFactorH = (NS/NR)/MWS.Shaft.PGB.TrqCoeff.CTrqRS;
-            MWS.Init.IC.PwrEMS = sign(PwrInLP*PwrFactorL)*min(abs([PwrInLP*PwrFactorL, MWS.Cntrl.EMS.PwrMax_Base, MWS.Cntrl.EMS.TrqMax_Base*MWS.Init.IC.NemS/5252.113]));
+            if MWS.In.Options.HybridConfig == 3
+                PwrCoupMax = 0;
+            else
+                PwrCoupMax = MWS.Cntrl.EMS.PwrMax_Base;
+            end
+            MWS.Init.IC.PwrEMS = sign(PwrInLP*PwrFactorL)*min(abs([PwrInLP*PwrFactorL, PwrCoupMax, MWS.Cntrl.EMS.TrqMax_Base*MWS.Init.IC.NemS/5252.113]));
             MWS.Init.IC.PwrEMC = sign(PwrInLP-MWS.Init.IC.PwrEMS/PwrFactorL)*min(abs([PwrInLP-MWS.Init.IC.PwrEMS/PwrFactorL, MWS.Cntrl.EMC.PwrMax_Base, MWS.Cntrl.EMC.TrqMax_Base*MWS.Init.IC.NemC/5252.113]));
             MWS.Init.IC.PwrEMR = sign(PwrInHP-MWS.Init.IC.PwrEMS/PwrFactorH)*min(abs([PwrInHP-MWS.Init.IC.PwrEMS/PwrFactorH, MWS.Cntrl.EMR.PwrMax_Base, MWS.Cntrl.EMR.TrqMax_Base*MWS.Init.IC.NemR/5252.113]));
             MWS.Init.IC.PwrEMP = 0;
         elseif MWS.In.Options.PGBConfig == 5 %HP-Carrier, LP-Sun
             PwrFactorL = (NR/NS)/MWS.Shaft.PGB.TrqCoeff.CTrqSR;
             PwrFactorH = (NR/NC)/MWS.Shaft.PGB.TrqCoeff.CTrqCR;
-            MWS.Init.IC.PwrEMR = sign(PwrInLP*PwrFactorL)*min(abs([PwrInLP*PwrFactorL, MWS.Cntrl.EMR.PwrMax_Base, MWS.Cntrl.EMR.TrqMax_Base*MWS.Init.IC.NemR/5252.113]));
+            if MWS.In.Options.HybridConfig == 3
+                PwrCoupMax = 0;
+            else
+                PwrCoupMax = MWS.Cntrl.EMR.PwrMax_Base;
+            end
+            MWS.Init.IC.PwrEMR = sign(PwrInLP*PwrFactorL)*min(abs([PwrInLP*PwrFactorL, PwrCoupMax, MWS.Cntrl.EMR.TrqMax_Base*MWS.Init.IC.NemR/5252.113]));
             MWS.Init.IC.PwrEMS = sign(PwrInLP-MWS.Init.IC.PwrEMR/PwrFactorL)*min(abs([PwrInLP-MWS.Init.IC.PwrEMR/PwrFactorL, MWS.Cntrl.EMS.PwrMax_Base, MWS.Cntrl.EMS.TrqMax_Base*MWS.Init.IC.NemS/5252.113]));
             MWS.Init.IC.PwrEMC = sign(PwrInHP-MWS.Init.IC.PwrEMR/PwrFactorH)*min(abs([PwrInHP-MWS.Init.IC.PwrEMR/PwrFactorH, MWS.Cntrl.EMC.PwrMax_Base, MWS.Cntrl.EMC.TrqMax_Base*MWS.Init.IC.NemC/5252.113]));
             MWS.Init.IC.PwrEMP = 0;
         else %HP-Carrier, LP-Ring
             PwrFactorL = (NS/NR)/MWS.Shaft.PGB.TrqCoeff.CTrqRS;
             PwrFactorH = (NS/NC)/MWS.Shaft.PGB.TrqCoeff.CTrqCS;
-            MWS.Init.IC.PwrEMS = sign(PwrInLP*PwrFactorL)*min(abs([PwrInLP*PwrFactorL, MWS.Cntrl.EMS.PwrMax_Base, MWS.Cntrl.EMS.TrqMax_Base*MWS.Init.IC.NemS/5252.113]));
+            if MWS.In.Options.HybridConfig == 3
+                PwrCoupMax = 0;
+            else
+                PwrCoupMax = MWS.Cntrl.EMS.PwrMax_Base;
+            end
+            MWS.Init.IC.PwrEMS = sign(PwrInLP*PwrFactorL)*min(abs([PwrInLP*PwrFactorL, PwrCoupMax, MWS.Cntrl.EMS.TrqMax_Base*MWS.Init.IC.NemS/5252.113]));
             MWS.Init.IC.PwrEMR = sign(PwrInLP-MWS.Init.IC.PwrEMS/PwrFactorL)*min(abs([PwrInLP-MWS.Init.IC.PwrEMS/PwrFactorL, MWS.Cntrl.EMR.PwrMax_Base, MWS.Cntrl.EMR.TrqMax_Base*MWS.Init.IC.NemR/5252.113]));
             MWS.Init.IC.PwrEMC = sign(PwrInHP-MWS.Init.IC.PwrEMS/PwrFactorH)*min(abs([PwrInHP-MWS.Init.IC.PwrEMS/PwrFactorH, MWS.Cntrl.EMC.PwrMax_Base, MWS.Cntrl.EMC.TrqMax_Base*MWS.Init.IC.NemC/5252.113]));
             MWS.Init.IC.PwrEMP = 0;
